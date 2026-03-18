@@ -126,11 +126,17 @@ export default function ChatPage() {
       })
       const data = await res.json()
 
+      const confidence = data.confidence ?? null
+      const debugInfo = data.debug || null
+      const answerWithMeta = confidence !== null
+        ? `${data.answer || 'Désolé, je n\'ai pas pu répondre.'}\n\n---\n🎯 Confiance : ${confidence}%${debugInfo ? ` · ${debugInfo.chunks_found} chunks trouvés → ${debugInfo.chunks_after_rerank} reranked → ${debugInfo.chunks_relevant} pertinents` : ''}`
+        : data.answer || 'Désolé, je n\'ai pas pu répondre.'
+
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         conversation_id: convId,
         role: 'assistant',
-        content: data.answer || 'Désolé, je n\'ai pas pu répondre.',
+        content: answerWithMeta,
         sources: data.sources || [],
         created_at: new Date().toISOString(),
       }
