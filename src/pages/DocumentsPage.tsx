@@ -3,8 +3,7 @@ import { supabase } from '@/lib/supabase'
 import type { Document } from '@/types'
 import { FileText, Upload, Trash2, Globe, Database, Search, CheckCircle, Clock, AlertCircle, Loader } from 'lucide-react'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
-const INGEST_URL = `${SUPABASE_URL}/functions/v1/rag-ingest`
+const INGEST_URL = 'https://decimal.cosy-groupe.com/webhook/rag-ingest'
 
 const sourceIcons: Record<string, typeof FileText> = {
   upload: Upload,
@@ -112,17 +111,27 @@ export default function DocumentsPage() {
 
   async function triggerIngest(documentId: string) {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
       await fetch(INGEST_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_id: documentId }),
       })
+      // Poll for status change
+      const poll = setInterval(async () => {
+        const { data } = await supabase
+          .from('rag_documents')
+          .select('status, chunk_count')
+          .eq('id', documentId)
+          .single()
+        if (data && data.status !== 'pending' && data.status !== 'processing') {
+          clearInterval(poll)
+          setDocuments(d => d.map(doc => doc.id === documentId ? { ...doc, ...data } : doc))
+        }
+      }, 3000)
+      // Stop polling after 2 minutes
+      setTimeout(() => clearInterval(poll), 120000)
     } catch {
-      // Ingestion will be retried by n8n
+      // Ingestion will be retried
     }
   }
 

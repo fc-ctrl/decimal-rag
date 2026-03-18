@@ -4,8 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Send, Plus, MessageSquare, Trash2, FileText } from 'lucide-react'
 import type { ChatConversation, ChatMessage } from '@/types'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
-const CHAT_URL = `${SUPABASE_URL}/functions/v1/rag-chat`
+const CHAT_URL = 'https://decimal.cosy-groupe.com/webhook/rag-chat'
 
 export default function ChatPage() {
   const { profile } = useAuth()
@@ -112,32 +111,27 @@ export default function ChatPage() {
     })
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
-          conversation_id: convId,
-          message: userMsg.content,
+          chatInput: userMsg.content,
+          sessionId: convId,
         }),
       })
       const data = await res.json()
 
-      const confidence = data.confidence ?? null
-      const debugInfo = data.debug || null
-      const answerWithMeta = confidence !== null
-        ? `${data.answer || 'Désolé, je n\'ai pas pu répondre.'}\n\n---\n🎯 Confiance : ${confidence}%${debugInfo ? ` · ${debugInfo.chunks_found} chunks trouvés → ${debugInfo.chunks_after_rerank} reranked → ${debugInfo.chunks_relevant} pertinents` : ''}`
-        : data.answer || 'Désolé, je n\'ai pas pu répondre.'
+      // n8n Agent returns { output: "..." }
+      const answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
 
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         conversation_id: convId,
         role: 'assistant',
-        content: answerWithMeta,
-        sources: data.sources || [],
+        content: answerText,
+        sources: [],
         created_at: new Date().toISOString(),
       }
       setMessages(m => [...m, assistantMsg])
