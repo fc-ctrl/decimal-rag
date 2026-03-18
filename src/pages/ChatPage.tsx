@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { Send, Plus, MessageSquare, Trash2, FileText } from 'lucide-react'
 import type { ChatConversation, ChatMessage } from '@/types'
 
-const CHAT_URL = 'https://decimal.cosy-groupe.com/webhook/rag-chat'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
+const CHAT_URL = `${SUPABASE_URL}/functions/v1/rag-chat`
 
 export default function ChatPage() {
   const { profile } = useAuth()

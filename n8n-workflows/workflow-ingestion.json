@@ -1,0 +1,337 @@
+{
+  "name": "Decimal RAG — Ingestion",
+  "nodes": [
+    {
+      "id": "webhook2",
+      "name": "Webhook Ingestion",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-600, 0],
+      "parameters": {
+        "path": "rag-ingest",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "getdoc",
+      "name": "Lire Document",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-350, 0],
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "rag_documents",
+        "filterType": "string",
+        "filterString": "=id=eq.{{ $json.body.document_id }}",
+        "returnAll": false,
+        "limit": 1
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "5tl9S85Vu5TINDim",
+          "name": "Supabase Postgres (n8n chat)"
+        }
+      }
+    },
+    {
+      "id": "statusprocess",
+      "name": "Status Processing",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-100, 0],
+      "parameters": {
+        "operation": "update",
+        "tableId": "rag_documents",
+        "matchingColumns": ["id"],
+        "fieldsToSend": "defineBelow",
+        "fieldValues": {
+          "values": [
+            {"fieldName": "status", "fieldValue": "processing"},
+            {"fieldName": "id", "fieldValue": "={{ $json.id }}"}
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "5tl9S85Vu5TINDim",
+          "name": "Supabase Postgres (n8n chat)"
+        }
+      }
+    },
+    {
+      "id": "deleteold",
+      "name": "Supprimer Anciens Chunks",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [150, 0],
+      "parameters": {
+        "operation": "delete",
+        "tableId": "rag_chunks",
+        "filterType": "string",
+        "filterString": "=document_id=eq.{{ $('Lire Document').item.json.id }}"
+      },
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "5tl9S85Vu5TINDim",
+          "name": "Supabase Postgres (n8n chat)"
+        }
+      }
+    },
+    {
+      "id": "fetchurl",
+      "name": "Fetch URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 0],
+      "parameters": {
+        "url": "={{ $('Lire Document').item.json.source_ref }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "htmltotext",
+      "name": "HTML vers Texte",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 0],
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data;\nconst text = html\n  .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nreturn [{ json: { text, document_id: $('Lire Document').item.json.id, title: $('Lire Document').item.json.title } }];"
+      }
+    },
+    {
+      "id": "chunking",
+      "name": "Chunking Intelligent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 0],
+      "parameters": {
+        "jsCode": "const MAX_CHUNK = 1000;\nconst MIN_CHUNK = 400;\nconst OVERLAP = 100;\n\nconst text = $input.first().json.text;\nconst docId = $input.first().json.document_id;\nconst title = $input.first().json.title;\n\nfunction cleanText(t) { return t.replace(/\\s+/g, ' ').trim(); }\n\nconst lines = text.split('\\n');\nconst rawChunks = [];\nlet current = '';\n\nfor (const line of lines) {\n  const trimmed = line.trim();\n  if (!trimmed) continue;\n  const isHeading = /^#{1,6}\\s+/.test(trimmed);\n  if (isHeading && current.trim()) {\n    rawChunks.push(cleanText(current));\n    current = '';\n  }\n  current += trimmed + ' ';\n}\nif (current.trim()) rawChunks.push(cleanText(current));\nif (rawChunks.length === 0) rawChunks.push(cleanText(text));\n\nconst sized = [];\nfor (const chunk of rawChunks) {\n  if (chunk.length <= MAX_CHUNK) {\n    sized.push(chunk);\n  } else {\n    let remaining = chunk;\n    while (remaining.length > 0) {\n      if (remaining.length <= MAX_CHUNK) { sized.push(remaining); break; }\n      const slice = remaining.substring(0, MAX_CHUNK);\n      let bp = -1;\n      for (const end of ['. ', '! ', '? ']) {\n        const idx = slice.lastIndexOf(end);\n        if (idx > MAX_CHUNK * 0.7 && idx > bp) bp = idx + end.length;\n      }\n      if (bp < 0) {\n        const sp = slice.lastIndexOf(' ');\n        bp = sp > MAX_CHUNK * 0.7 ? sp + 1 : MAX_CHUNK;\n      }\n      sized.push(remaining.substring(0, bp).trim());\n      remaining = remaining.substring(bp).trim();\n    }\n  }\n}\n\nconst merged = [];\nfor (const chunk of sized) {\n  if (merged.length > 0 && chunk.length < MIN_CHUNK) {\n    const prev = merged[merged.length - 1];\n    if (prev.length + chunk.length + 1 <= MAX_CHUNK) {\n      merged[merged.length - 1] = prev + ' ' + chunk;\n      continue;\n    }\n  }\n  merged.push(chunk);\n}\n\nconst result = [];\nfor (let i = 0; i < merged.length; i++) {\n  let chunk = merged[i];\n  if (i > 0) chunk = merged[i-1].slice(-OVERLAP) + ' ... ' + chunk;\n  result.push({\n    json: {\n      chunk_content: chunk,\n      full_document: text.substring(0, 3000),\n      document_id: docId,\n      title: title,\n      chunk_index: i\n    }\n  });\n}\n\nreturn result;"
+      }
+    },
+    {
+      "id": "loopchunks",
+      "name": "Loop par Chunk",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1150, 0],
+      "parameters": {
+        "options": {}
+      }
+    },
+    {
+      "id": "contextllm",
+      "name": "Contextualisation",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [1400, -80],
+      "parameters": {
+        "promptType": "define",
+        "text": "=<document>\n{{ $json.full_document }}\n</document>\n\n<chunk>\n{{ $json.chunk_content }}\n</chunk>\n\nFournissez un court contexte (2-3 phrases) pour situer ce fragment dans le document global afin d'améliorer sa récupération lors des recherches. Répondez uniquement avec le contexte.",
+        "batching": {}
+      }
+    },
+    {
+      "id": "contextllm_model",
+      "name": "GPT-4o-mini Context",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1400, 200],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0,
+          "maxTokens": 150
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ofSSEvpXZSj1zVP0",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "id": "mergechunk",
+      "name": "Fusionner Chunk + Contexte",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1700, -80],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "content",
+              "value": "=[Contexte: {{ $json.text }}]\n\n{{ $('Loop par Chunk').item.json.chunk_content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "vectorstore2",
+      "name": "Supabase Vector Store Insert",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1,
+      "position": [1950, -80],
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "rag_chunks",
+          "mode": "list",
+          "cachedResultName": "rag_chunks"
+        },
+        "options": {
+          "queryName": "match_rag_chunks"
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "5tl9S85Vu5TINDim",
+          "name": "Supabase Postgres (n8n chat)"
+        }
+      }
+    },
+    {
+      "id": "embeddings2",
+      "name": "Embeddings Insert",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [1850, 200],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "ofSSEvpXZSj1zVP0",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "id": "docloader",
+      "name": "Document Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [2050, 200],
+      "parameters": {
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "document_id",
+                "value": "={{ $('Lire Document').item.json.id }}"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "textsplitter",
+      "name": "Text Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [2200, 400],
+      "parameters": {
+        "chunkSize": 1400,
+        "options": {}
+      }
+    },
+    {
+      "id": "statusready",
+      "name": "Status Ready",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2200, -80],
+      "parameters": {
+        "operation": "update",
+        "tableId": "rag_documents",
+        "matchingColumns": ["id"],
+        "fieldsToSend": "defineBelow",
+        "fieldValues": {
+          "values": [
+            {"fieldName": "status", "fieldValue": "ready"},
+            {"fieldName": "id", "fieldValue": "={{ $('Lire Document').item.json.id }}"}
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "5tl9S85Vu5TINDim",
+          "name": "Supabase Postgres (n8n chat)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Ingestion": {
+      "main": [[{"node": "Lire Document", "type": "main", "index": 0}]]
+    },
+    "Lire Document": {
+      "main": [[{"node": "Status Processing", "type": "main", "index": 0}]]
+    },
+    "Status Processing": {
+      "main": [[{"node": "Supprimer Anciens Chunks", "type": "main", "index": 0}]]
+    },
+    "Supprimer Anciens Chunks": {
+      "main": [[{"node": "Fetch URL", "type": "main", "index": 0}]]
+    },
+    "Fetch URL": {
+      "main": [[{"node": "HTML vers Texte", "type": "main", "index": 0}]]
+    },
+    "HTML vers Texte": {
+      "main": [[{"node": "Chunking Intelligent", "type": "main", "index": 0}]]
+    },
+    "Chunking Intelligent": {
+      "main": [[{"node": "Loop par Chunk", "type": "main", "index": 0}]]
+    },
+    "Loop par Chunk": {
+      "main": [
+        [{"node": "Supabase Vector Store Insert", "type": "main", "index": 0}],
+        [{"node": "Contextualisation", "type": "main", "index": 0}]
+      ]
+    },
+    "Contextualisation": {
+      "main": [[{"node": "Fusionner Chunk + Contexte", "type": "main", "index": 0}]]
+    },
+    "GPT-4o-mini Context": {
+      "ai_languageModel": [[{"node": "Contextualisation", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Fusionner Chunk + Contexte": {
+      "main": [[{"node": "Loop par Chunk", "type": "main", "index": 0}]]
+    },
+    "Embeddings Insert": {
+      "ai_embedding": [[{"node": "Supabase Vector Store Insert", "type": "ai_embedding", "index": 0}]]
+    },
+    "Document Loader": {
+      "ai_document": [[{"node": "Supabase Vector Store Insert", "type": "ai_document", "index": 0}]]
+    },
+    "Text Splitter": {
+      "ai_textSplitter": [[{"node": "Document Loader", "type": "ai_textSplitter", "index": 0}]]
+    },
+    "Supabase Vector Store Insert": {
+      "main": [[{"node": "Status Ready", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
