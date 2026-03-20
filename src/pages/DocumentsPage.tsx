@@ -49,6 +49,12 @@ export default function DocumentsPage() {
     setUploading(true)
 
     for (const file of Array.from(files)) {
+      // Limite 5 Mo
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`Le fichier ${file.name} dépasse 5 Mo (${(file.size / 1024 / 1024).toFixed(1)} Mo). Veuillez le compresser.`)
+        continue
+      }
+
       const path = `rag/${Date.now()}_${file.name}`
       const { error: uploadErr } = await supabase.storage
         .from('rag-documents')
@@ -128,8 +134,8 @@ export default function DocumentsPage() {
           setDocuments(d => d.map(doc => doc.id === documentId ? { ...doc, ...data } : doc))
         }
       }, 3000)
-      // Stop polling after 2 minutes
-      setTimeout(() => clearInterval(poll), 120000)
+      // Stop polling after 5 minutes (PDFs take longer)
+      setTimeout(() => clearInterval(poll), 300000)
     } catch {
       // Ingestion will be retried
     }
