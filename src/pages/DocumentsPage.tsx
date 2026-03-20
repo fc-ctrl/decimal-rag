@@ -4,8 +4,7 @@ import type { Document } from '@/types'
 import { FileText, Upload, Trash2, Globe, Database, Search, CheckCircle, Clock, AlertCircle, Loader } from 'lucide-react'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
-const INGEST_URL_HTML = `${SUPABASE_URL}/functions/v1/rag-ingest`
-const INGEST_URL_FILE = 'https://decimal.cosy-groupe.com/webhook/decimal-rag-ingest-file'
+const INGEST_URL = `${SUPABASE_URL}/functions/v1/rag-ingest`
 
 const sourceIcons: Record<string, typeof FileText> = {
   upload: Upload,
@@ -76,7 +75,7 @@ export default function DocumentsPage() {
 
       if (doc) {
         setDocuments(d => [doc, ...d])
-        triggerIngest(doc.id, path)
+        triggerIngest(doc.id)
       }
     }
 
@@ -102,7 +101,7 @@ export default function DocumentsPage() {
 
     if (doc) {
       setDocuments(d => [doc, ...d])
-      triggerIngest(doc.id, url)
+      triggerIngest(doc.id)
     }
 
     setUrl('')
@@ -110,17 +109,9 @@ export default function DocumentsPage() {
     setUploading(false)
   }
 
-  async function triggerIngest(documentId: string, sourceRef?: string) {
+  async function triggerIngest(documentId: string) {
     try {
-      // Route vers n8n pour PDF/Word, Edge Function pour HTML
-      const isPdfOrWord = sourceRef && (
-        sourceRef.toLowerCase().endsWith('.pdf') ||
-        sourceRef.toLowerCase().endsWith('.docx') ||
-        sourceRef.toLowerCase().endsWith('.doc')
-      )
-      const ingestUrl = isPdfOrWord ? INGEST_URL_FILE : INGEST_URL_HTML
-
-      await fetch(ingestUrl, {
+      await fetch(INGEST_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_id: documentId }),
