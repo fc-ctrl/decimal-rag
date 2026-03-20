@@ -3,7 +3,8 @@ import { supabase } from '@/lib/supabase'
 import type { Document } from '@/types'
 import { FileText, Upload, Trash2, Globe, Database, Search, CheckCircle, Clock, AlertCircle, Loader } from 'lucide-react'
 
-const INGEST_URL = 'https://decimal.cosy-groupe.com/webhook/decimal-rag-ingest'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
+const INGEST_URL = `${SUPABASE_URL}/functions/v1/rag-ingest`
 
 const sourceIcons: Record<string, typeof FileText> = {
   upload: Upload,
