@@ -2,9 +2,27 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Document } from '@/types'
 import { FileText, Upload, Trash2, Globe, Database, Search, CheckCircle, Clock, AlertCircle, Loader } from 'lucide-react'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Configure pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
 const INGEST_URL = `${SUPABASE_URL}/functions/v1/rag-ingest`
+const INGEST_TEXT_URL = `${SUPABASE_URL}/functions/v1/rag-ingest-text`
+
+async function extractTextFromPDF(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer()
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+  const pages: string[] = []
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    const text = content.items.map((item: unknown) => (item as { str?: string }).str || '').join(' ')
+    if (text.trim()) pages.push(text.trim())
+  }
+  return pages.join('\n\n')
+}
 
 const sourceIcons: Record<string, typeof FileText> = {
   upload: Upload,
@@ -81,7 +99,37 @@ export default function DocumentsPage() {
 
       if (doc) {
         setDocuments(d => [doc, ...d])
-        triggerIngest(doc.id)
+
+        // For PDFs, extract text client-side and send to rag-ingest-text
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        if (isPdf) {
+          try {
+            const pdfText = await extractTextFromPDF(file)
+            if (pdfText.length > 50) {
+              await fetch(INGEST_TEXT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ document_id: doc.id, text: pdfText }),
+              })
+            } else {
+              // Fallback to standard ingestion
+              await fetch(INGEST_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ document_id: doc.id }),
+              })
+            }
+          } catch {
+            // Fallback to standard ingestion
+            await fetch(INGEST_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ document_id: doc.id }),
+            })
+          }
+        } else {
+          triggerIngest(doc.id)
+        }
       }
     }
 
