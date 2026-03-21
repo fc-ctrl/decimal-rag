@@ -14,29 +14,42 @@ function extractSourceRefs(text: string): string[] {
   return [...new Set([...matches].map(m => m[1].trim()))]
 }
 
-async function resolveSourceLinks(refs: string[], docs: Document[]): Promise<SourceLink[]> {
+async function resolveSourceLinks(refs: string[], docs: Document[], answerText: string): Promise<SourceLink[]> {
   const links: SourceLink[] = []
   const seen = new Set<string>()
+  const answerLower = answerText.toLowerCase()
+
   for (const ref of refs) {
     const refLower = ref.toLowerCase()
-    // Extract significant words from the source reference (skip common words)
     const skipWords = new Set(['source','manuel','manual','installation','utilisation','document','technique','pour','votre','dans','avec','plus'])
     const refWords = refLower.split(/[\s'']+/).filter(w => w.length > 4 && !skipWords.has(w))
 
-    const doc = docs.find(d => {
+    // Find ALL matching docs, then pick the best one
+    const candidates = docs.filter(d => {
       if (d.source_type !== 'upload') return false
       const titleLower = d.title.toLowerCase()
-      // Check if any significant word from the source ref matches part of the filename
       return refWords.some(w => titleLower.includes(w.substring(0, 5)))
     })
 
-    if (doc?.source_ref && !seen.has(doc.id)) {
-      seen.add(doc.id)
+    // Score candidates: prefer the one that matches version hints in the answer
+    let best = candidates[0] || null
+    if (candidates.length > 1) {
+      const hasV2Hint = answerLower.includes('v2') || answerLower.includes('2024') || /\bE\d{2}\b/.test(answerText)
+      const hasV1Hint = answerLower.includes('v1') || answerLower.includes('2023') || /\b(code\s+)?0[3-9]\b/.test(answerLower)
+      for (const c of candidates) {
+        const tl = c.title.toLowerCase()
+        if (hasV2Hint && (tl.includes('2') && tl.includes('vertigo'))) { best = c; break }
+        if (hasV1Hint && (tl.includes('1') && tl.includes('vertigo'))) { best = c; break }
+      }
+    }
+
+    if (best?.source_ref && !seen.has(best.id)) {
+      seen.add(best.id)
       const { data } = await supabase.storage
         .from('rag-documents')
-        .createSignedUrl(doc.source_ref, 3600)
+        .createSignedUrl(best.source_ref, 3600)
       if (data?.signedUrl) {
-        links.push({ label: doc.title, url: data.signedUrl })
+        links.push({ label: best.title, url: data.signedUrl })
       }
     }
   }
@@ -190,7 +203,7 @@ export default function ChatPage() {
       // Resolve download links from [Source: ...] references
       const sourceRefs = extractSourceRefs(answerText)
       if (sourceRefs.length > 0) {
-        resolveSourceLinks(sourceRefs, docs).then(links => {
+        resolveSourceLinks(sourceRefs, docs, answerText).then(links => {
           if (links.length > 0) {
             setDownloadLinks(prev => ({ ...prev, [assistantMsg.id]: links }))
           }
