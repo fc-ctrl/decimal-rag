@@ -67,9 +67,9 @@ export default function DocumentsPage() {
     setUploading(true)
 
     for (const file of Array.from(files)) {
-      // Limite 5 Mo
-      if (file.size > 5 * 1024 * 1024) {
-        alert(`Le fichier ${file.name} dépasse 5 Mo (${(file.size / 1024 / 1024).toFixed(1)} Mo). Veuillez le compresser.`)
+      // Limite 20 Mo
+      if (file.size > 20 * 1024 * 1024) {
+        alert(`Le fichier ${file.name} dépasse 20 Mo (${(file.size / 1024 / 1024).toFixed(1)} Mo). Veuillez le compresser.`)
         continue
       }
 
@@ -84,7 +84,7 @@ export default function DocumentsPage() {
       }
 
       // Insert document record
-      const { data: doc } = await supabase.from('rag_documents').insert({
+      const { data: doc, error: docErr } = await supabase.from('rag_documents').insert({
         org_id: 'default',
         user_id: (await supabase.auth.getUser()).data.user?.id,
         title: file.name,
@@ -97,42 +97,49 @@ export default function DocumentsPage() {
         metadata: {},
       }).select().single()
 
-      if (doc) {
-        setDocuments(d => [doc, ...d])
+      if (docErr || !doc) {
+        alert(`Erreur création document ${file.name}: ${docErr?.message || 'inconnu'}`)
+        continue
+      }
 
-        // For PDFs, extract text client-side and send to rag-ingest-text
-        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-        if (isPdf) {
-          try {
-            const pdfText = await extractTextFromPDF(file)
-            if (pdfText.length > 50) {
-              await fetch(INGEST_TEXT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ document_id: doc.id, text: pdfText }),
-              })
-            } else {
-              // Fallback to standard ingestion
-              await fetch(INGEST_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ document_id: doc.id }),
-              })
-            }
-          } catch {
-            // Fallback to standard ingestion
-            await fetch(INGEST_URL, {
+      setDocuments(d => [doc, ...d])
+
+      // For PDFs, extract text client-side and send to rag-ingest-text
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+      if (isPdf) {
+        try {
+          const pdfText = await extractTextFromPDF(file)
+          if (pdfText.length > 50) {
+            const res = await fetch(INGEST_TEXT_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ document_id: doc.id }),
+              body: JSON.stringify({ document_id: doc.id, text: pdfText }),
             })
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ error: res.statusText }))
+              console.error('rag-ingest-text error:', err)
+              // Fallback to server-side extraction
+              triggerIngest(doc.id)
+            } else {
+              // Poll for status like triggerIngest does
+              pollDocumentStatus(doc.id)
+            }
+          } else {
+            // Not enough text extracted client-side, use server-side
+            triggerIngest(doc.id)
           }
-        } else {
+        } catch (e) {
+          console.error('PDF extraction error:', e)
+          // Fallback to server-side extraction
           triggerIngest(doc.id)
         }
+      } else {
+        triggerIngest(doc.id)
       }
     }
 
+    // Reset file input so same file can be re-selected
+    if (fileRef.current) fileRef.current.value = ''
     setUploading(false)
   }
 
@@ -163,29 +170,42 @@ export default function DocumentsPage() {
     setUploading(false)
   }
 
+  function pollDocumentStatus(documentId: string) {
+    // Update UI to show processing
+    setDocuments(d => d.map(doc => doc.id === documentId ? { ...doc, status: 'processing' } : doc))
+    const poll = setInterval(async () => {
+      const { data } = await supabase
+        .from('rag_documents')
+        .select('status, chunk_count, error_message')
+        .eq('id', documentId)
+        .single()
+      if (data && data.status !== 'pending' && data.status !== 'processing') {
+        clearInterval(poll)
+        setDocuments(d => d.map(doc => doc.id === documentId ? { ...doc, ...data } : doc))
+        if (data.status === 'error') {
+          alert(`Erreur d'ingestion : ${data.error_message || 'inconnu'}`)
+        }
+      }
+    }, 3000)
+    // Stop polling after 5 minutes
+    setTimeout(() => clearInterval(poll), 300000)
+  }
+
   async function triggerIngest(documentId: string) {
     try {
-      await fetch(INGEST_URL, {
+      const res = await fetch(INGEST_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ document_id: documentId }),
       })
-      // Poll for status change
-      const poll = setInterval(async () => {
-        const { data } = await supabase
-          .from('rag_documents')
-          .select('status, chunk_count')
-          .eq('id', documentId)
-          .single()
-        if (data && data.status !== 'pending' && data.status !== 'processing') {
-          clearInterval(poll)
-          setDocuments(d => d.map(doc => doc.id === documentId ? { ...doc, ...data } : doc))
-        }
-      }, 3000)
-      // Stop polling after 5 minutes (PDFs take longer)
-      setTimeout(() => clearInterval(poll), 300000)
-    } catch {
-      // Ingestion will be retried
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }))
+        console.error('rag-ingest error:', err)
+      }
+      pollDocumentStatus(documentId)
+    } catch (e) {
+      console.error('triggerIngest error:', e)
+      alert(`Erreur de connexion au serveur d'ingestion`)
     }
   }
 
