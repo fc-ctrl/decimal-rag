@@ -5,6 +5,7 @@ import ChatPage from '@/pages/ChatPage'
 import DocumentsPage from '@/pages/DocumentsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import { MessageSquare, FileText, Settings, LogOut, Brain } from 'lucide-react'
+import packageJson from '../package.json'
 
 function Layout() {
   const { profile, signOut } = useAuth()
@@ -19,8 +20,11 @@ function Layout() {
     <div className="flex flex-1">
       {/* Sidebar */}
       <nav className="w-14 bg-white border-r border-border flex flex-col items-center py-4 gap-1">
-        <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center mb-4">
-          <Brain size={20} className="text-white" />
+        <div className="flex flex-col items-center mb-4">
+          <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center">
+            <Brain size={20} className="text-white" />
+          </div>
+          <span className="text-[9px] text-text-muted mt-0.5">v{packageJson.version}</span>
         </div>
 
         {links.map(link => (
