@@ -1,8 +1,38 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { Send, Plus, MessageSquare, Trash2, FileText } from 'lucide-react'
-import type { ChatConversation, ChatMessage } from '@/types'
+import { Send, Plus, MessageSquare, Trash2, FileText, Download } from 'lucide-react'
+import type { ChatConversation, ChatMessage, Document } from '@/types'
+
+interface SourceLink {
+  label: string
+  url: string
+}
+
+function extractSourceRefs(text: string): string[] {
+  const matches = text.matchAll(/\[Source:\s*([^\]]+)\]/gi)
+  return [...new Set([...matches].map(m => m[1].trim()))]
+}
+
+async function resolveSourceLinks(refs: string[], docs: Document[]): Promise<SourceLink[]> {
+  const links: SourceLink[] = []
+  for (const ref of refs) {
+    const doc = docs.find(d =>
+      d.source_type === 'upload' &&
+      (d.title.toLowerCase().includes(ref.toLowerCase().substring(0, 20)) ||
+       ref.toLowerCase().includes(d.title.toLowerCase().replace(/\.[^.]+$/, '').substring(0, 20)))
+    )
+    if (doc?.source_ref) {
+      const { data } = await supabase.storage
+        .from('rag-documents')
+        .createSignedUrl(doc.source_ref, 3600)
+      if (data?.signedUrl) {
+        links.push({ label: doc.title, url: data.signedUrl })
+      }
+    }
+  }
+  return links
+}
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
 
@@ -13,11 +43,23 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [docs, setDocs] = useState<Document[]>([])
+  const [downloadLinks, setDownloadLinks] = useState<Record<string, SourceLink[]>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadConversations()
+    loadDocs()
   }, [])
+
+  async function loadDocs() {
+    const { data } = await supabase
+      .from('rag_documents')
+      .select('*')
+      .eq('source_type', 'upload')
+      .eq('status', 'ready')
+    setDocs(data || [])
+  }
 
   useEffect(() => {
     if (activeConv) loadMessages(activeConv)
@@ -136,6 +178,16 @@ export default function ChatPage() {
       }
       setMessages(m => [...m, assistantMsg])
 
+      // Resolve download links from [Source: ...] references
+      const sourceRefs = extractSourceRefs(answerText)
+      if (sourceRefs.length > 0) {
+        resolveSourceLinks(sourceRefs, docs).then(links => {
+          if (links.length > 0) {
+            setDownloadLinks(prev => ({ ...prev, [assistantMsg.id]: links }))
+          }
+        })
+      }
+
       // Save assistant message
       await supabase.from('rag_messages').insert({
         conversation_id: convId,
@@ -236,6 +288,23 @@ export default function ChatPage() {
                         <span>{s.document_title}</span>
                         <span className="text-[10px]">({Math.round(s.similarity * 100)}%)</span>
                       </div>
+                    ))}
+                  </div>
+                )}
+                {downloadLinks[msg.id] && downloadLinks[msg.id].length > 0 && (
+                  <div className="mt-3 pt-2 border-t border-border/30 space-y-1.5">
+                    <div className="text-xs font-medium opacity-70">Documents sources :</div>
+                    {downloadLinks[msg.id].map((link, i) => (
+                      <a
+                        key={i}
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover hover:underline"
+                      >
+                        <Download size={12} />
+                        <span>{link.label}</span>
+                      </a>
                     ))}
                   </div>
                 )}
