@@ -5,7 +5,7 @@ import { FileText, Upload, Trash2, Globe, Database, Search, CheckCircle, Clock, 
 import * as pdfjsLib from 'pdfjs-dist'
 
 // Configure pdf.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
 const INGEST_URL = `${SUPABASE_URL}/functions/v1/rag-ingest`
