@@ -16,13 +16,22 @@ function extractSourceRefs(text: string): string[] {
 
 async function resolveSourceLinks(refs: string[], docs: Document[]): Promise<SourceLink[]> {
   const links: SourceLink[] = []
+  const seen = new Set<string>()
   for (const ref of refs) {
-    const doc = docs.find(d =>
-      d.source_type === 'upload' &&
-      (d.title.toLowerCase().includes(ref.toLowerCase().substring(0, 20)) ||
-       ref.toLowerCase().includes(d.title.toLowerCase().replace(/\.[^.]+$/, '').substring(0, 20)))
-    )
-    if (doc?.source_ref) {
+    const refLower = ref.toLowerCase()
+    // Extract significant words from the source reference (skip common words)
+    const skipWords = new Set(['source','manuel','manual','installation','utilisation','document','technique','pour','votre','dans','avec','plus'])
+    const refWords = refLower.split(/[\s'']+/).filter(w => w.length > 4 && !skipWords.has(w))
+
+    const doc = docs.find(d => {
+      if (d.source_type !== 'upload') return false
+      const titleLower = d.title.toLowerCase()
+      // Check if any significant word from the source ref matches part of the filename
+      return refWords.some(w => titleLower.includes(w.substring(0, 5)))
+    })
+
+    if (doc?.source_ref && !seen.has(doc.id)) {
+      seen.add(doc.id)
       const { data } = await supabase.storage
         .from('rag-documents')
         .createSignedUrl(doc.source_ref, 3600)
