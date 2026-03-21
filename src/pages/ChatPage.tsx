@@ -287,7 +287,11 @@ export default function ChatPage() {
                   ? 'bg-primary text-white'
                   : 'bg-white border border-border'
               }`}>
-                <div className="whitespace-pre-wrap">{msg.content}</div>
+                <div className="whitespace-pre-wrap">{msg.content.split(/(https?:\/\/[^\s\]]+)/g).map((part, i) =>
+                  /^https?:\/\//.test(part) ? (
+                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary-hover break-all">{part}</a>
+                  ) : part
+                )}</div>
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-3 pt-2 border-t border-border/30 space-y-1">
                     <div className="text-xs font-medium opacity-70">Sources :</div>
