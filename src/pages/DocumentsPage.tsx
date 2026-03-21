@@ -11,16 +11,24 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpup
 const INGEST_URL = `${SUPABASE_URL}/functions/v1/rag-ingest`
 const INGEST_TEXT_URL = `${SUPABASE_URL}/functions/v1/rag-ingest-text`
 
-async function extractTextFromPDF(file: File): Promise<string> {
+async function extractTextFromPDF(
+  file: File,
+  onProgress?: (step: string, pct: number) => void,
+): Promise<string> {
+  onProgress?.('Lecture du fichier...', 0)
   const arrayBuffer = await file.arrayBuffer()
+  onProgress?.('Ouverture du PDF...', 5)
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
   const pages: string[] = []
-  for (let i = 1; i <= pdf.numPages; i++) {
+  const total = pdf.numPages
+  for (let i = 1; i <= total; i++) {
+    onProgress?.(`Extraction page ${i}/${total}`, 5 + Math.round((i / total) * 85))
     const page = await pdf.getPage(i)
     const content = await page.getTextContent()
     const text = content.items.map((item: unknown) => (item as { str?: string }).str || '').join(' ')
     if (text.trim()) pages.push(text.trim())
   }
+  onProgress?.('Extraction terminée', 95)
   return pages.join('\n\n')
 }
 
@@ -46,6 +54,7 @@ export default function DocumentsPage() {
   const [showUrlForm, setShowUrlForm] = useState(false)
   const [url, setUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ step: string; pct: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -108,8 +117,11 @@ export default function DocumentsPage() {
       const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
       if (isPdf) {
         try {
-          const pdfText = await extractTextFromPDF(file)
+          const pdfText = await extractTextFromPDF(file, (step, pct) => {
+            setUploadProgress({ step, pct })
+          })
           if (pdfText.length > 50) {
+            setUploadProgress({ step: 'Envoi au serveur...', pct: 97 })
             const res = await fetch(INGEST_TEXT_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -140,6 +152,7 @@ export default function DocumentsPage() {
 
     // Reset file input so same file can be re-selected
     if (fileRef.current) fileRef.current.value = ''
+    setUploadProgress(null)
     setUploading(false)
   }
 
@@ -263,6 +276,22 @@ export default function DocumentsPage() {
           />
         </div>
       </div>
+
+      {/* Upload progress bar */}
+      {uploadProgress && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-sm text-blue-700 font-medium">{uploadProgress.step}</span>
+            <span className="text-xs text-blue-500">{uploadProgress.pct}%</span>
+          </div>
+          <div className="w-full bg-blue-100 rounded-full h-2">
+            <div
+              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${uploadProgress.pct}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* URL form */}
       {showUrlForm && (
