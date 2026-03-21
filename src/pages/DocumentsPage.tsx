@@ -9,7 +9,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dis
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://plbjafwltwpupspmlnip.supabase.co'
 const INGEST_URL = `${SUPABASE_URL}/functions/v1/rag-ingest`
-const INGEST_TEXT_URL = `${SUPABASE_URL}/functions/v1/rag-ingest-text`
+const INGEST_TEXT_URL = 'https://n8n.decimal-ia.com/webhook/rag-ingest-text'
 
 async function extractTextFromPDF(
   file: File,
