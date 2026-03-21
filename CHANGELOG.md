@@ -5,6 +5,40 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et [Se
 
 ---
 
+## [0.8.1] — 2026-03-21
+
+### Amélioré
+- **Barre de progression PDF** : affiche l'étape en cours et le pourcentage pendant l'extraction PDF (page par page), l'envoi au serveur et le traitement — plus de bouton "Upload..." bloqué sans feedback
+
+---
+
+## [0.8.0] — 2026-03-21
+
+### Ajouté
+- **Numéro de version** affiché dans la sidebar près du logo
+
+---
+
+## [0.7.0] — 2026-03-20
+
+### Ajouté
+- **Extraction PDF côté client** avec pdf.js — plus de dépendance serveur pour lire les PDFs
+- **Edge Function rag-ingest-text** : ingestion depuis texte brut extrait côté navigateur
+
+### Amélioré
+- Limite upload augmentée de 5 Mo à 20 Mo
+- Polling du statut d'ingestion avec feedback d'erreur
+
+---
+
+## [0.6.0] — 2026-03-20
+
+### Modifié
+- **Migration chat vers Hostinger** (n8n.decimal-ia.com)
+- Upload fichier avec limite 5 Mo
+
+---
+
 ## [0.2.0] — 2026-03-18
 
 ### Ajouté
