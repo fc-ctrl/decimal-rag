@@ -5,6 +5,26 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et [Se
 
 ---
 
+## [0.9.0] — 2026-03-21
+
+### Ajouté
+- **Téléchargement des notices sources** : quand le chat cite un document PDF, un lien de téléchargement apparaît sous la réponse permettant de récupérer le PDF original
+- **Ingestion PDF via n8n Hostinger** : remplacement de l'Edge Function Supabase (WORKER_LIMIT) par un workflow n8n robuste
+- **Contextualisation LLM** : chaque chunk est enrichi d'un contexte GPT-4o-mini pour améliorer la recherche sémantique et éviter la confusion entre documents
+- **Fonctions RPC Supabase** : `rag_ingest_chunks` et `rag_update_doc_status` pour l'ingestion depuis n8n
+
+### Corrigé
+- Upload de gros PDFs qui crashait avec WORKER_LIMIT sur Supabase Edge Functions
+
+---
+
+## [0.8.2] — 2026-03-21
+
+### Corrigé
+- Ingestion PDF redirigée vers webhook n8n Hostinger au lieu de l'Edge Function Supabase
+
+---
+
 ## [0.8.1] — 2026-03-21
 
 ### Amélioré
