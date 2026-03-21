@@ -232,9 +232,22 @@ export default function DocumentsPage() {
     setDocuments(d => d.filter(x => x.id !== id))
   }
 
-  const filtered = documents.filter(d =>
-    d.title.toLowerCase().includes(search.toLowerCase())
-  )
+  const [filterType, setFilterType] = useState<'all' | 'upload' | 'url' | 'other'>('all')
+
+  const filtered = documents.filter(d => {
+    const matchSearch = d.title.toLowerCase().includes(search.toLowerCase())
+    if (filterType === 'all') return matchSearch
+    if (filterType === 'upload') return matchSearch && d.source_type === 'upload'
+    if (filterType === 'url') return matchSearch && d.source_type === 'url'
+    return matchSearch && d.source_type !== 'upload' && d.source_type !== 'url'
+  })
+
+  const countByType = {
+    all: documents.length,
+    upload: documents.filter(d => d.source_type === 'upload').length,
+    url: documents.filter(d => d.source_type === 'url').length,
+    other: documents.filter(d => d.source_type !== 'upload' && d.source_type !== 'url').length,
+  }
 
   if (loading) {
     return (
@@ -245,8 +258,8 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-6 max-w-5xl overflow-y-auto h-full">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold flex items-center gap-2">
           <FileText size={20} />
           Documents ({documents.length})
@@ -275,6 +288,27 @@ export default function DocumentsPage() {
             onChange={e => handleFileUpload(e.target.files)}
           />
         </div>
+      </div>
+
+      {/* Stats by type */}
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        {([
+          { key: 'all' as const, label: 'Tous', color: 'text-primary' },
+          { key: 'upload' as const, label: 'PDF / Fichiers', color: 'text-blue-600' },
+          { key: 'url' as const, label: 'Pages web', color: 'text-green-600' },
+          { key: 'other' as const, label: 'Autres', color: 'text-orange-600' },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setFilterType(t.key)}
+            className={`bg-white rounded-xl border p-3 text-left transition-colors ${
+              filterType === t.key ? 'border-primary ring-1 ring-primary/20' : 'border-border hover:border-gray-300'
+            }`}
+          >
+            <div className={`text-xl font-bold ${t.color}`}>{countByType[t.key]}</div>
+            <div className="text-xs text-text-muted">{t.label}</div>
+          </button>
+        ))}
       </div>
 
       {/* Upload progress bar */}
@@ -338,9 +372,15 @@ export default function DocumentsPage() {
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate">{doc.title}</div>
                   <div className="text-xs text-text-muted">
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mr-1.5 ${
+                      doc.source_type === 'upload' ? 'bg-blue-100 text-blue-700' : doc.source_type === 'url' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                    }`}>
+                      {doc.source_type === 'upload' ? 'PDF' : doc.source_type === 'url' ? 'URL' : doc.source_type}
+                    </span>
                     {doc.chunk_count} chunks
                     {doc.file_size ? ` · ${(doc.file_size / 1024).toFixed(0)} Ko` : ''}
                     {' · '}{new Date(doc.created_at).toLocaleDateString('fr-FR')}
+                    {doc.updated_at && doc.updated_at !== doc.created_at && ` (maj ${new Date(doc.updated_at).toLocaleDateString('fr-FR')})`}
                   </div>
                 </div>
               </div>

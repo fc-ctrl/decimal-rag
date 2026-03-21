@@ -5,6 +5,24 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et [Se
 
 ---
 
+## [1.0.0] — 2026-03-21
+
+### Ajouté
+- **Page Historique** : consultation de toutes les conversations Q&A avec filtrage par durée (7j, 30j, 90j, tout), recherche textuelle, statistiques (conversations, questions, réponses), et déroulement des échanges
+- **Page Documents améliorée** : filtres par type (PDF, URL, Autres) avec compteurs, badges de type colorés, date de mise à jour affichée
+- **Distinction Vertigo V1/V2** dans le prompt Chat : identification automatique par code erreur (03→V1, E17→V2) ou question sur la forme du boîtier (rectangulaire/rond)
+- **93 documents ingérés** : notices PDF, articles Cosy Piscine, fichiers de diagnostic
+- **Import en masse** : script `bulk-ingest.mjs` pour ingestion automatique des fichiers .txt et URLs du sitemap
+
+---
+
+## [0.9.1] — 2026-03-21
+
+### Amélioré
+- URLs cliquables dans les réponses du chat
+
+---
+
 ## [0.9.0] — 2026-03-21
 
 ### Ajouté
