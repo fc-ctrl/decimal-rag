@@ -67,6 +67,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false)
   const [docs, setDocs] = useState<Document[]>([])
   const [downloadLinks, setDownloadLinks] = useState<Record<string, SourceLink[]>>({})
+  const streamingRef = useRef(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -175,30 +176,63 @@ export default function ChatPage() {
     })
 
     try {
-      const res = await fetch(CHAT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chatInput: userMsg.content,
-          sessionId: convId,
-        }),
-      })
-      const data = await res.json()
+      // --- Cache check ---
+      const queryHash = userMsg.content.toLowerCase().trim().replace(/\s+/g, ' ')
+      let answerText = ''
+      let fromCache = false
 
-      // n8n Agent returns { output: "..." }
-      const answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
+      const { data: cacheHit } = await supabase.rpc('rag_cache_get', { p_query_hash: queryHash })
+      if (cacheHit && cacheHit.length > 0 && cacheHit[0].answer) {
+        answerText = cacheHit[0].answer
+        fromCache = true
+      } else {
+        const res = await fetch(CHAT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chatInput: userMsg.content,
+            sessionId: convId,
+          }),
+        })
+        const data = await res.json()
+        answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
 
+        // Store in cache (fire and forget)
+        supabase.rpc('rag_cache_set', {
+          p_query_hash: queryHash,
+          p_query_text: userMsg.content,
+          p_answer: answerText,
+        }).then(() => {})
+      }
+
+      const msgId = crypto.randomUUID()
       const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: msgId,
         conversation_id: convId,
         role: 'assistant',
         content: answerText,
         sources: [],
         created_at: new Date().toISOString(),
       }
-      setMessages(m => [...m, assistantMsg])
+
+      // Typing effect: show answer progressively (word by word)
+      if (!fromCache && answerText.length > 50) {
+        streamingRef.current = true
+        setMessages(m => [...m, { ...assistantMsg, content: '' }])
+        const words = answerText.split(/(\s+)/)
+        let displayed = ''
+        for (let w = 0; w < words.length; w++) {
+          displayed += words[w]
+          const snap = displayed
+          setMessages(m => m.map(msg => msg.id === msgId ? { ...msg, content: snap } : msg))
+          if (words[w].trim()) await new Promise(r => setTimeout(r, 15))
+        }
+        streamingRef.current = false
+      } else {
+        setMessages(m => [...m, assistantMsg])
+      }
 
       // Resolve download links from [Source: ...] references
       const sourceRefs = extractSourceRefs(answerText)

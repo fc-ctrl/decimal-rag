@@ -5,6 +5,14 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et [Se
 
 ---
 
+## [1.1.0] — 2026-03-21
+
+### Ajouté
+- **Cache intelligent** : les réponses aux questions déjà posées sont mises en cache (7 jours). Cache hit = réponse en <1 seconde sans appeler GPT-4o. Table `rag_cache` avec RPC `rag_cache_get` / `rag_cache_set`
+- **Streaming simulé** : les réponses s'affichent mot par mot (typing effect ~15ms/mot) au lieu d'apparaître d'un bloc après 8 secondes d'attente. Les réponses depuis le cache s'affichent instantanément sans animation
+
+---
+
 ## [1.0.0] — 2026-03-21
 
 ### Ajouté
