@@ -239,8 +239,19 @@ export default function CatalogPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(item => (
           <div key={item.id} className="bg-white rounded-xl border border-border overflow-hidden group">
-            {item.photo_url ? (
-              <img src={item.photo_url} alt={item.model} className="w-full h-40 object-cover" />
+            {/* Photos carousel */}
+            {(item.photos?.length > 0 || item.photo_url) ? (
+              <div className="relative">
+                <div className="flex overflow-x-auto gap-0.5 snap-x">
+                  {(item.photos?.length > 0 ? item.photos : [{ url: item.photo_url || '', view: 'face' }]).map((p, i) => (
+                    <div key={i} className="min-w-full snap-center relative">
+                      <img src={p.url} alt={p.view} className="w-full h-40 object-cover" />
+                      <span className="absolute bottom-1 left-1 text-[9px] bg-black/50 text-white px-1.5 py-0.5 rounded">{p.view}</span>
+                    </div>
+                  ))}
+                </div>
+                <span className="absolute top-1 right-1 text-[9px] bg-black/50 text-white px-1.5 py-0.5 rounded">{item.photos?.length || 1} photo{(item.photos?.length || 1) > 1 ? 's' : ''}</span>
+              </div>
             ) : (
               <div className="w-full h-40 bg-gray-100 flex items-center justify-center">
                 <Camera size={32} className="text-gray-300" />
@@ -253,9 +264,25 @@ export default function CatalogPage() {
                   <div className="text-xs text-text-muted">{item.type}</div>
                   {item.visual_traits && <div className="text-xs text-text-muted mt-1 italic">{item.visual_traits}</div>}
                 </div>
-                <button onClick={() => deleteItem(item.id)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger">
-                  <Trash2 size={14} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <label className="opacity-0 group-hover:opacity-100 cursor-pointer text-text-muted hover:text-primary" title="Ajouter une vue">
+                    <Camera size={14} />
+                    <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const reader = new FileReader()
+                      reader.onload = async () => {
+                        const newPhotos = [...(item.photos || []), { url: reader.result as string, view: 'autre' }]
+                        await supabase.from('rag_equipment_catalog').update({ photos: newPhotos, photo_url: newPhotos[0]?.url }).eq('id', item.id)
+                        loadCatalog()
+                      }
+                      reader.readAsDataURL(file)
+                    }} />
+                  </label>
+                  <button onClick={() => deleteItem(item.id)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
