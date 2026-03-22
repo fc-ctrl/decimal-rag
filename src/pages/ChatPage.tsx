@@ -169,6 +169,7 @@ export default function ChatPage() {
   const [docs, setDocs] = useState<Document[]>([])
   const [downloadLinks, setDownloadLinks] = useState<Record<string, SourceLink[]>>({})
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null)
+  const [catalogItems, setCatalogItems] = useState<{ brand: string; model: string; type: string; visual_traits: string | null }[]>([])
   const photoRef = useRef<HTMLInputElement>(null)
   const streamingRef = useRef(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -176,6 +177,7 @@ export default function ChatPage() {
   useEffect(() => {
     loadConversations()
     loadDocs()
+    loadCatalog()
   }, [])
 
   async function loadDocs() {
@@ -184,6 +186,13 @@ export default function ChatPage() {
       .select('*')
       .eq('status', 'ready')
     setDocs(data || [])
+  }
+
+  async function loadCatalog() {
+    const { data } = await supabase
+      .from('rag_equipment_catalog')
+      .select('brand, model, type, visual_traits')
+    setCatalogItems(data || [])
   }
 
   useEffect(() => {
@@ -302,7 +311,9 @@ export default function ChatPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chatInput: input,
+          chatInput: imageData && catalogItems.length > 0
+            ? `${input}\n\nEQUIPEMENTS CONNUS (compare la photo avec cette liste) :\n${catalogItems.map(c => `- ${c.brand} ${c.model} (${c.type})${c.visual_traits ? ' : ' + c.visual_traits : ''}`).join('\n')}`
+            : input,
           sessionId: convId,
           ...(imageData ? { image: imageData.base64 } : {}),
         }),
