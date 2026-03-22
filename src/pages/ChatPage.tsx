@@ -201,10 +201,40 @@ export default function ChatPage() {
       const answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
       const fromCache = data.fromCache || false
 
-      // The AI should include links in its response text (via n8n system prompt).
-      // No need to append links from frontend — the structured .txt files contain all URLs.
-      // Remove the ⚠️ verification note (too noisy, low value)
-      const fullAnswer = answerText.replace(/\n\n⚠️ Note:.*$/s, '')
+      // Remove the ⚠️ verification note (too noisy)
+      let fullAnswer = answerText.replace(/\n\n⚠️ Note:.*$/s, '')
+
+      // Fallback: if AI didn't include a PDF link, check equipment-associated PDFs
+      if (!fullAnswer.includes('.pdf') && !fullAnswer.includes('cosy-piscine')) {
+        try {
+          const { data: eqDocs } = await supabase
+            .from('rag_documents')
+            .select('title, source_ref, metadata')
+            .eq('source_type', 'upload')
+            .eq('status', 'ready')
+            .not('metadata->equipment_model', 'is', null)
+          const answerLower = fullAnswer.toLowerCase()
+          const matchedPdfs: { title: string; url: string; label: string }[] = []
+          for (const doc of eqDocs || []) {
+            const meta = doc.metadata as Record<string, string>
+            const models = (meta.equipment_model || '').toLowerCase().split('/').map(m => m.trim())
+            const mentioned = models.some(model => {
+              const words = model.split(/\s+/).filter(w => w.length > 2)
+              return words.length > 0 && words.every(w => answerLower.includes(w))
+            })
+            if (mentioned && doc.source_ref) {
+              const { data: signed } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
+              if (signed?.signedUrl) {
+                matchedPdfs.push({ title: doc.title, url: signed.signedUrl, label: `${doc.title} (${meta.equipment_brand || ''} ${meta.equipment_model || ''})`.trim() })
+              }
+            }
+          }
+          if (matchedPdfs.length > 0) {
+            const pdfLinks = matchedPdfs.map(p => `- [${p.label}](${p.url})`).join('\n')
+            fullAnswer = `${fullAnswer}\n\n**Documentation disponible :**\n${pdfLinks}`
+          }
+        } catch {}
+      }
 
       const msgId = crypto.randomUUID()
       const assistantMsg: ChatMessage = {
