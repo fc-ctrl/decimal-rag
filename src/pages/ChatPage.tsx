@@ -2,13 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { Send, Plus, MessageSquare, Trash2, FileText, Camera } from 'lucide-react'
-import type { ChatConversation, ChatMessage, Document } from '@/types'
-
-interface SourceLink {
-  label: string
-  url: string
-}
+import { Send, Plus, MessageSquare, Trash2, Camera } from 'lucide-react'
+import type { ChatConversation, ChatMessage } from '@/types'
 
 // Simple markdown renderer: **bold**, [text](url), raw URLs
 function renderMarkdown(text: string): ReactNode[] {
@@ -39,158 +34,7 @@ function renderMarkdown(text: string): ReactNode[] {
   return elements
 }
 
-function extractSourceRefs(text: string): string[] {
-  const matches = text.matchAll(/\[Source:\s*([^\]]+)\]/gi)
-  return [...new Set([...matches].map(m => m[1].trim()))]
-}
-
-async function resolveSourceLinks(refs: string[], docs: Document[], answerText: string): Promise<SourceLink[]> {
-  const links: SourceLink[] = []
-  const seen = new Set<string>()
-  const answerLower = answerText.toLowerCase()
-  const skipWords = new Set(['source','manuel','manual','installation','utilisation','document','technique','pour','votre','dans','avec','plus','pompe','piscine','poolex','chaleur','filtration'])
-
-  for (const ref of refs) {
-    const refLower = ref.toLowerCase()
-    const refWords = refLower.split(/[\s'']+/).filter(w => w.length > 4 && !skipWords.has(w))
-
-    // Strategy 1: Match by filename
-    const byTitle = docs.filter(d => {
-      if (d.source_type !== 'upload') return false
-      const tl = d.title.toLowerCase()
-      return refWords.some(w => tl.includes(w.substring(0, 5)))
-    })
-
-    // Strategy 2: Match by equipment metadata (if answer mentions the model)
-    const byEquipment = docs.filter(d => {
-      if (d.source_type !== 'upload') return false
-      const meta = d.metadata as Record<string, string>
-      if (!meta?.equipment_model) return false
-      const model = meta.equipment_model.toLowerCase()
-      // Check if the source ref or answer mentions this equipment
-      return model.split(/\s+/).filter(w => w.length > 3).some(w => refLower.includes(w) || answerLower.includes(w))
-    })
-
-    // Merge candidates, prefer equipment matches
-    const allCandidates = [...new Map([...byEquipment, ...byTitle].map(d => [d.id, d])).values()]
-
-    // Score: equipment match > title match, and prefer version-specific
-    let best = allCandidates[0] || null
-    if (allCandidates.length > 1) {
-      // Prefer equipment-matched docs
-      const eqMatch = allCandidates.find(d => byEquipment.includes(d))
-      if (eqMatch) best = eqMatch
-
-      // Version hints for Vertigo
-      const hasV2Hint = answerLower.includes('v2') || answerLower.includes('2024') || /\bE\d{2}\b/.test(answerText)
-      const hasV1Hint = answerLower.includes('v1') || answerLower.includes('2023')
-      for (const c of allCandidates) {
-        const tl = c.title.toLowerCase()
-        if (hasV2Hint && tl.includes('2') && tl.includes('vertigo')) { best = c; break }
-        if (hasV1Hint && tl.includes('1') && tl.includes('vertigo')) { best = c; break }
-      }
-
-      // WiFi hints
-      if (answerLower.includes('wifi') || answerLower.includes('vp wifi')) {
-        const wifiDoc = allCandidates.find(d => d.title.toLowerCase().includes('wifi') || ((d.metadata as Record<string,string>)?.equipment_model || '').toLowerCase().includes('wifi'))
-        if (wifiDoc) best = wifiDoc
-      }
-    }
-
-    if (best?.source_ref && !seen.has(best.id)) {
-      seen.add(best.id)
-      const { data } = await supabase.storage
-        .from('rag-documents')
-        .createSignedUrl(best.source_ref, 3600)
-      if (data?.signedUrl) {
-        links.push({ label: best.title, url: data.signedUrl })
-      }
-    }
-  }
-  return links
-}
-
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
-
-// Clean label from URL: extract filename for PDFs, readable slug for pages
-function urlLabel(url: string): string {
-  const pdfMatch = url.match(/\/([^/]+\.pdf)/i)
-  if (pdfMatch) {
-    return pdfMatch[1].replace(/[_-]/g, ' ').replace(/\.pdf$/i, '').replace(/\b\w/g, c => c.toUpperCase()) + ' (PDF)'
-  }
-  const slug = url.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
-  if (slug.includes('wp-content')) {
-    const filename = slug.split('/').pop() || slug
-    return filename.replace(/[_-]/g, ' ').replace(/\.\w+$/, '').replace(/\b\w/g, c => c.toUpperCase()) + ' (PDF)'
-  }
-  return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
-
-// Common pool words to ignore when matching URLs (too generic, match everything)
-const URL_STOP_WORDS = new Set(['piscine','electrolyseur','pompe','filtre','votre','comment','guide','bien','pour',
-  'dans','avec','plus','causes','solutions','complet','etape','conseils','chlore','traitement','fonctionnement'])
-
-// Find all relevant docs: PDFs (signed URL) + web pages (direct link)
-async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: string): Promise<SourceLink[]> {
-  const links: SourceLink[] = []
-  const seen = new Set<string>()
-  const answerLower = answerText.toLowerCase()
-  // 1. Source ref matching (from [Source: ...] tags) — PDFs only
-  const refLinks = await resolveSourceLinks(refs, allDocs, answerText)
-  for (const l of refLinks) {
-    if (!seen.has(l.url)) { seen.add(l.url); links.push(l) }
-  }
-
-  // 2. Equipment-associated documents (PDFs + URLs)
-  const docsWithRef = allDocs.filter(d => d.source_ref)
-  for (const doc of docsWithRef) {
-    if (seen.has(doc.id)) continue
-    const meta = doc.metadata as Record<string, unknown>
-    const eqModel = ((meta?.equipment_model as string) || '').toLowerCase()
-    if (!eqModel) continue
-    const models = eqModel.split('/').map(m => m.trim()).filter(Boolean)
-    const mentioned = models.some(model => {
-      const words = model.split(/\s+/).filter(w => w.length > 2)
-      return words.length > 0 && words.every(w => answerLower.includes(w))
-    })
-    if (mentioned) {
-      if (doc.source_type === 'upload') {
-        const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
-        if (data?.signedUrl) {
-          seen.add(doc.id)
-          links.push({ label: `${doc.title} (${(meta.equipment_brand as string) || ''} ${eqModel})`.trim(), url: data.signedUrl })
-        }
-      } else if (doc.source_type === 'url') {
-        seen.add(doc.id)
-        links.push({ label: urlLabel(doc.source_ref), url: doc.source_ref })
-      }
-    }
-  }
-
-  // 3. URL documents — strict keyword matching (fallback if not equipment-linked)
-  const urlDocs = allDocs.filter(d => d.source_type === 'url' && d.source_ref)
-  const urlScored: { doc: typeof urlDocs[0]; score: number }[] = []
-  for (const doc of urlDocs) {
-    if (seen.has(doc.id)) continue
-    const slug = doc.source_ref.toLowerCase().replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
-    const slugWords = slug.split(/[-_/]/).filter(w => w.length > 3 && !URL_STOP_WORDS.has(w))
-    if (slugWords.length === 0) continue
-    const matchCount = slugWords.filter(w => answerLower.includes(w)).length
-    const ratio = matchCount / slugWords.length
-    if (matchCount >= 2 && ratio >= 0.5) {
-      urlScored.push({ doc, score: matchCount + ratio })
-    }
-  }
-  urlScored.sort((a, b) => b.score - a.score)
-  for (const { doc } of urlScored.slice(0, 2)) {
-    seen.add(doc.id)
-    const slug = doc.source_ref.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
-    const label = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    links.push({ label, url: doc.source_ref })
-  }
-
-  return links
-}
 
 export default function ChatPage() {
   const { profile } = useAuth()
@@ -199,7 +43,6 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
-  const [docs, setDocs] = useState<Document[]>([])
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null)
   const [catalogItems, setCatalogItems] = useState<{ brand: string; model: string; type: string; visual_traits: string | null }[]>([])
   const photoRef = useRef<HTMLInputElement>(null)
@@ -208,17 +51,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     loadConversations()
-    loadDocs()
     loadCatalog()
   }, [])
-
-  async function loadDocs() {
-    const { data } = await supabase
-      .from('rag_documents')
-      .select('*')
-      .eq('status', 'ready')
-    setDocs(data || [])
-  }
 
   async function loadCatalog() {
     const { data } = await supabase
@@ -367,16 +201,10 @@ export default function ChatPage() {
       const answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
       const fromCache = data.fromCache || false
 
-      // Resolve links BEFORE displaying the answer
-      const sourceRefs = extractSourceRefs(answerText)
-      const resolvedLinks = await resolveAllLinks(sourceRefs, docs, answerText)
-
-      // Inject links into the answer text as markdown links
-      let fullAnswer = answerText
-      if (resolvedLinks.length > 0) {
-        const linkLines = resolvedLinks.map(l => `- [${l.label}](${l.url})`).join('\n')
-        fullAnswer = `${answerText}\n\n**Ces liens pourraient vous intéresser :**\n${linkLines}`
-      }
+      // The AI should include links in its response text (via n8n system prompt).
+      // No need to append links from frontend — the structured .txt files contain all URLs.
+      // Remove the ⚠️ verification note (too noisy, low value)
+      const fullAnswer = answerText.replace(/\n\n⚠️ Note:.*$/s, '')
 
       const msgId = crypto.randomUUID()
       const assistantMsg: ChatMessage = {
@@ -496,18 +324,6 @@ export default function ChatPage() {
                   : 'bg-white border border-border'
               }`}>
                 <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-border/30 space-y-1">
-                    <div className="text-xs font-medium opacity-70">Sources :</div>
-                    {msg.sources.map((s, i) => (
-                      <div key={i} className="flex items-center gap-1 text-xs opacity-70">
-                        <FileText size={10} />
-                        <span>{s.document_title}</span>
-                        <span className="text-[10px]">({Math.round(s.similarity * 100)}%)</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           ))}
