@@ -182,9 +182,14 @@ export default function CatalogPage() {
           <Package size={20} />
           Catalogue équipements ({items.length})
         </h1>
-        <button onClick={() => firstPhotoRef.current?.click()} className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover">
-          <Plus size={14} /> Ajouter (photo)
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setAdding(true); setNewItem({ brand: '', model: '', type: '', visual_traits: '' }); setPhotoQueue([]) }} className="flex items-center gap-1 px-3 py-1.5 border border-border rounded-lg text-sm hover:bg-gray-50">
+            <Plus size={14} /> Ajouter manuel
+          </button>
+          <button onClick={() => firstPhotoRef.current?.click()} className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover">
+            <Camera size={14} /> Ajouter (photo)
+          </button>
+        </div>
         <input ref={firstPhotoRef} type="file" accept="image/*" className="hidden" onChange={handleFirstPhoto} />
       </div>
 
@@ -243,7 +248,7 @@ export default function CatalogPage() {
           </div>
 
           {/* Champs identification */}
-          {!analyzing && photoQueue.length > 0 && (
+          {!analyzing && (
             <div className="space-y-3 pt-2 border-t border-border">
               <div className="grid grid-cols-2 gap-3">
                 <div>
