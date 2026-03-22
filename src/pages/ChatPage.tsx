@@ -82,6 +82,41 @@ async function resolveSourceLinks(refs: string[], docs: Document[], answerText: 
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
 
+// Find all relevant PDFs: from [Source:] refs + equipment mentioned in answer + all upload docs matching answer keywords
+async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: string): Promise<SourceLink[]> {
+  const links: SourceLink[] = []
+  const seen = new Set<string>()
+  const answerLower = answerText.toLowerCase()
+  const uploadDocs = allDocs.filter(d => d.source_type === 'upload' && d.source_ref)
+
+  // 1. Source ref matching (from [Source: ...] tags)
+  const refLinks = await resolveSourceLinks(refs, allDocs, answerText)
+  for (const l of refLinks) {
+    if (!seen.has(l.url)) { seen.add(l.url); links.push(l) }
+  }
+
+  // 2. Equipment-associated PDFs: if the answer mentions a product that has a PDF with equipment metadata
+  for (const doc of uploadDocs) {
+    if (seen.has(doc.id)) continue
+    const meta = doc.metadata as Record<string, string>
+    const model = (meta?.equipment_model || '').toLowerCase()
+    if (!model) continue
+
+    // Check if answer mentions this equipment (all significant words must appear)
+    const modelWords = model.split(/\s+/).filter(w => w.length > 2)
+    const mentioned = modelWords.length > 0 && modelWords.every(w => answerLower.includes(w))
+    if (mentioned) {
+      const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
+      if (data?.signedUrl) {
+        seen.add(doc.id)
+        links.push({ label: `${doc.title} (${meta.equipment_brand || ''} ${meta.equipment_model || ''})`.trim(), url: data.signedUrl })
+      }
+    }
+  }
+
+  return links
+}
+
 export default function ChatPage() {
   const { profile } = useAuth()
   const [conversations, setConversations] = useState<ChatConversation[]>([])
@@ -262,15 +297,13 @@ export default function ChatPage() {
         setMessages(m => [...m, assistantMsg])
       }
 
-      // Resolve download links from [Source: ...] references
+      // Resolve download links: from [Source:...] refs + equipment mentioned in answer
       const sourceRefs = extractSourceRefs(answerText)
-      if (sourceRefs.length > 0) {
-        resolveSourceLinks(sourceRefs, docs, answerText).then(links => {
-          if (links.length > 0) {
-            setDownloadLinks(prev => ({ ...prev, [assistantMsg.id]: links }))
-          }
-        })
-      }
+      resolveAllLinks(sourceRefs, docs, answerText).then(links => {
+        if (links.length > 0) {
+          setDownloadLinks(prev => ({ ...prev, [assistantMsg.id]: links }))
+        }
+      })
 
       // Save assistant message
       await supabase.from('rag_messages').insert({
