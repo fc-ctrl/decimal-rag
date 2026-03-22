@@ -176,36 +176,19 @@ export default function ChatPage() {
     })
 
     try {
-      // --- Cache check ---
-      const queryHash = userMsg.content.toLowerCase().trim().replace(/\s+/g, ' ')
-      let answerText = ''
-      let fromCache = false
-
-      const { data: cacheHit } = await supabase.rpc('rag_cache_get', { p_query_hash: queryHash })
-      if (cacheHit && cacheHit.length > 0 && cacheHit[0].answer) {
-        answerText = cacheHit[0].answer
-        fromCache = true
-      } else {
-        const res = await fetch(CHAT_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chatInput: userMsg.content,
-            sessionId: convId,
-          }),
-        })
-        const data = await res.json()
-        answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
-
-        // Store in cache (fire and forget)
-        supabase.rpc('rag_cache_set', {
-          p_query_hash: queryHash,
-          p_query_text: userMsg.content,
-          p_answer: answerText,
-        }).then(() => {})
-      }
+      const res = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chatInput: userMsg.content,
+          sessionId: convId,
+        }),
+      })
+      const data = await res.json()
+      const answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
+      const fromCache = data.fromCache || false
 
       const msgId = crypto.randomUUID()
       const assistantMsg: ChatMessage = {
