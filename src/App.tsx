@@ -5,8 +5,9 @@ import ChatPage from '@/pages/ChatPage'
 import DocumentsPage from '@/pages/DocumentsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import HistoryPage from '@/pages/HistoryPage'
+import CatalogPage from '@/pages/CatalogPage'
 import ClientApp from '@/pages/client/ClientApp'
-import { MessageSquare, FileText, Settings, LogOut, Brain, History } from 'lucide-react'
+import { MessageSquare, FileText, Settings, LogOut, Brain, History, Package } from 'lucide-react'
 import packageJson from '../package.json'
 
 function Layout() {
@@ -16,6 +17,7 @@ function Layout() {
     { to: '/', icon: MessageSquare, label: 'Chat' },
     { to: '/documents', icon: FileText, label: 'Documents' },
     { to: '/history', icon: History, label: 'Historique' },
+    { to: '/catalog', icon: Package, label: 'Catalogue' },
     { to: '/settings', icon: Settings, label: 'Paramètres' },
   ]
 
@@ -62,6 +64,7 @@ function Layout() {
           <Route path="/" element={<ChatPage />} />
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
