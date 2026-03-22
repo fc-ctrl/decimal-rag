@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import type { ReactNode } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { Send, Plus, MessageSquare, Trash2, FileText, Camera } from 'lucide-react'
@@ -7,6 +8,35 @@ import type { ChatConversation, ChatMessage, Document } from '@/types'
 interface SourceLink {
   label: string
   url: string
+}
+
+// Simple markdown renderer: **bold**, [text](url), raw URLs
+function renderMarkdown(text: string): ReactNode[] {
+  const elements: ReactNode[] = []
+  // Split by lines to handle block-level formatting
+  const lines = text.split('\n')
+  for (let li = 0; li < lines.length; li++) {
+    if (li > 0) elements.push('\n')
+    const line = lines[li]
+    // Parse inline: **bold**, [text](url), raw URLs
+    const parts = line.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\)|https?:\/\/[^\s)]+)/g)
+    for (let pi = 0; pi < parts.length; pi++) {
+      const p = parts[pi]
+      const key = `${li}-${pi}`
+      const boldMatch = p.match(/^\*\*(.+)\*\*$/)
+      const linkMatch = p.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+      if (boldMatch) {
+        elements.push(<strong key={key}>{boldMatch[1]}</strong>)
+      } else if (linkMatch) {
+        elements.push(<a key={key} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary-hover">{linkMatch[1]}</a>)
+      } else if (/^https?:\/\//.test(p)) {
+        elements.push(<a key={key} href={p} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary-hover break-all">{p}</a>)
+      } else {
+        elements.push(p)
+      }
+    }
+  }
+  return elements
 }
 
 function extractSourceRefs(text: string): string[] {
@@ -125,23 +155,7 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
     }
   }
 
-  // 3. PDF matching by title keywords (even without equipment metadata)
-  const uploadDocs = allDocs.filter(d => d.source_type === 'upload' && d.source_ref)
-  for (const doc of uploadDocs) {
-    if (seen.has(doc.id)) continue
-    const titleWords = doc.title.toLowerCase().replace(/[._-]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !URL_STOP_WORDS.has(w))
-    if (titleWords.length === 0) continue
-    const titleMatch = titleWords.filter(w => answerLower.includes(w)).length
-    if (titleMatch >= 2 && titleMatch >= titleWords.length * 0.4) {
-      const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
-      if (data?.signedUrl) {
-        seen.add(doc.id)
-        links.push({ label: doc.title, url: data.signedUrl })
-      }
-    }
-  }
-
-  // 4. URL documents — strict keyword matching (fallback if not equipment-linked)
+  // 3. URL documents — strict keyword matching (fallback if not equipment-linked)
   const urlDocs = allDocs.filter(d => d.source_type === 'url' && d.source_ref)
   const urlScored: { doc: typeof urlDocs[0]; score: number }[] = []
   for (const doc of urlDocs) {
@@ -156,7 +170,7 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
     }
   }
   urlScored.sort((a, b) => b.score - a.score)
-  for (const { doc } of urlScored.slice(0, 3)) {
+  for (const { doc } of urlScored.slice(0, 2)) {
     seen.add(doc.id)
     const slug = doc.source_ref.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
     const label = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
@@ -345,11 +359,11 @@ export default function ChatPage() {
       const sourceRefs = extractSourceRefs(answerText)
       const resolvedLinks = await resolveAllLinks(sourceRefs, docs, answerText)
 
-      // Inject links into the answer text
+      // Inject links into the answer text as markdown links
       let fullAnswer = answerText
       if (resolvedLinks.length > 0) {
-        const linkLines = resolvedLinks.map(l => `- ${l.label} : ${l.url}`).join('\n')
-        fullAnswer = `${answerText}\n\n📎 Documents utiles :\n${linkLines}`
+        const linkLines = resolvedLinks.map(l => `- [${l.label}](${l.url})`).join('\n')
+        fullAnswer = `${answerText}\n\n**Ces liens pourraient vous intéresser :**\n${linkLines}`
       }
 
       const msgId = crypto.randomUUID()
@@ -469,11 +483,7 @@ export default function ChatPage() {
                   ? 'bg-primary text-white'
                   : 'bg-white border border-border'
               }`}>
-                <div className="whitespace-pre-wrap">{msg.content.split(/(https?:\/\/[^\s\]]+)/g).map((part, i) =>
-                  /^https?:\/\//.test(part) ? (
-                    <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary-hover break-all">{part}</a>
-                  ) : part
-                )}</div>
+                <div className="whitespace-pre-wrap">{renderMarkdown(msg.content)}</div>
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-3 pt-2 border-t border-border/30 space-y-1">
                     <div className="text-xs font-medium opacity-70">Sources :</div>
