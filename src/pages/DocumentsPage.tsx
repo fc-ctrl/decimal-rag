@@ -55,11 +55,20 @@ export default function DocumentsPage() {
   const [url, setUrl] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ step: string; pct: number } | null>(null)
+  const [selectedEquipment, setSelectedEquipment] = useState('')
+  const [catalogItems, setCatalogItems] = useState<{ id: string; brand: string; model: string; type: string }[]>([])
+  const [showEquipmentSelect, setShowEquipmentSelect] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     loadDocuments()
+    loadCatalog()
   }, [])
+
+  async function loadCatalog() {
+    const { data } = await supabase.from('rag_equipment_catalog').select('id, brand, model, type').order('brand')
+    setCatalogItems(data || [])
+  }
 
   async function loadDocuments() {
     setLoading(true)
@@ -92,6 +101,16 @@ export default function DocumentsPage() {
         continue
       }
 
+      // Build metadata with optional equipment association
+      const equipItem = catalogItems.find(c => c.id === selectedEquipment)
+      const docMetadata: Record<string, unknown> = {}
+      if (equipItem) {
+        docMetadata.equipment_id = equipItem.id
+        docMetadata.equipment_brand = equipItem.brand
+        docMetadata.equipment_model = equipItem.model
+        docMetadata.equipment_type = equipItem.type
+      }
+
       // Insert document record
       const { data: doc, error: docErr } = await supabase.from('rag_documents').insert({
         org_id: 'default',
@@ -103,7 +122,7 @@ export default function DocumentsPage() {
         file_size: file.size,
         chunk_count: 0,
         status: 'pending',
-        metadata: {},
+        metadata: docMetadata,
       }).select().single()
 
       if (docErr || !doc) {
@@ -125,7 +144,7 @@ export default function DocumentsPage() {
             const res = await fetch(INGEST_TEXT_URL, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ document_id: doc.id, text: pdfText }),
+              body: JSON.stringify({ document_id: doc.id, text: pdfText, title: file.name, equipment: equipItem ? `${equipItem.brand} ${equipItem.model}` : '' }),
             })
             if (!res.ok) {
               const err = await res.json().catch(() => ({ error: res.statusText }))
@@ -273,6 +292,12 @@ export default function DocumentsPage() {
             URL
           </button>
           <button
+            onClick={() => setShowEquipmentSelect(!showEquipmentSelect)}
+            className={`flex items-center gap-1 px-3 py-1.5 border rounded-lg text-sm ${selectedEquipment ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-gray-50'}`}
+          >
+            {selectedEquipment ? catalogItems.find(c => c.id === selectedEquipment)?.model || 'Équipement' : 'Associer équipement'}
+          </button>
+          <button
             onClick={() => fileRef.current?.click()}
             className="flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover"
           >
@@ -289,6 +314,31 @@ export default function DocumentsPage() {
           />
         </div>
       </div>
+
+      {/* Equipment selector */}
+      {showEquipmentSelect && (
+        <div className="mb-4 bg-white rounded-xl border border-border p-3">
+          <div className="text-xs text-text-muted mb-2">Associer le prochain upload à un équipement du catalogue (optionnel) :</div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => { setSelectedEquipment(''); setShowEquipmentSelect(false) }}
+              className={`px-3 py-1.5 rounded-lg text-xs border ${!selectedEquipment ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-gray-50'}`}
+            >
+              Aucun
+            </button>
+            {catalogItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => { setSelectedEquipment(item.id); setShowEquipmentSelect(false) }}
+                className={`px-3 py-1.5 rounded-lg text-xs border ${selectedEquipment === item.id ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-gray-50'}`}
+              >
+                {item.brand} {item.model}
+                <span className="text-text-muted ml-1">({item.type})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats by type */}
       <div className="grid grid-cols-4 gap-3 mb-4">
