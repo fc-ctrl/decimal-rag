@@ -5,6 +5,7 @@ import ChatPage from '@/pages/ChatPage'
 import DocumentsPage from '@/pages/DocumentsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import HistoryPage from '@/pages/HistoryPage'
+import ClientApp from '@/pages/client/ClientApp'
 import { MessageSquare, FileText, Settings, LogOut, Brain, History } from 'lucide-react'
 import packageJson from '../package.json'
 
@@ -84,12 +85,22 @@ function AppRoutes() {
   return <Layout />
 }
 
+function ClientRoute() {
+  return <ClientApp />
+}
+
+
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <Routes>
+        <Route path="/client/*" element={<ClientRoute />} />
+        <Route path="/*" element={
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        } />
+      </Routes>
     </BrowserRouter>
   )
 }

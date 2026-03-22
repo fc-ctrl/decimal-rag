@@ -5,6 +5,20 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et [Se
 
 ---
 
+## [2.0.0] — 2026-03-22
+
+### Ajouté — App Client Cosy Piscine (/client)
+- **Login client** : authentification par email vérifié dans Airtable Extrabat Cosy (table Contacts)
+- **Dashboard client** : vue d'ensemble avec matériel, dernières demandes SAV, accès rapide chat/matériel/SAV
+- **Mon matériel** : ajout d'équipements par photo (GPT-4o Vision identifie automatiquement), édition, liste des équipements du client
+- **Chat SAV contextualisé** : le RAG connaît le matériel du client, plus besoin de demander le modèle. Photo possible dans le chat
+- **Mes demandes SAV** : lecture des tickets SAV depuis Airtable avec statut, description, interventions
+- **Workflows n8n** : Cosy Client Auth (vérification email Airtable) + Cosy Client Data (dashboard/SAV)
+- **Tables Supabase** : cosy_equipment, cosy_client_sessions, rag_equipment_catalog
+- **Routing séparé** : /client = app client Cosy, / = back-office admin Decimal RAG
+
+---
+
 ## [1.2.0] — 2026-03-22
 
 ### Ajouté
