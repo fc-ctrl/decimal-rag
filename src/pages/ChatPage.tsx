@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { Send, Plus, MessageSquare, Trash2, FileText, Download, Camera, ExternalLink } from 'lucide-react'
+import { Send, Plus, MessageSquare, Trash2, FileText, Camera } from 'lucide-react'
 import type { ChatConversation, ChatMessage, Document } from '@/types'
 
 interface SourceLink {
@@ -174,7 +174,6 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [docs, setDocs] = useState<Document[]>([])
-  const [downloadLinks, setDownloadLinks] = useState<Record<string, SourceLink[]>>({})
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null)
   const [catalogItems, setCatalogItems] = useState<{ brand: string; model: string; type: string; visual_traits: string | null }[]>([])
   const photoRef = useRef<HTMLInputElement>(null)
@@ -342,21 +341,32 @@ export default function ChatPage() {
       const answerText = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
       const fromCache = data.fromCache || false
 
+      // Resolve links BEFORE displaying the answer
+      const sourceRefs = extractSourceRefs(answerText)
+      const resolvedLinks = await resolveAllLinks(sourceRefs, docs, answerText)
+
+      // Inject links into the answer text
+      let fullAnswer = answerText
+      if (resolvedLinks.length > 0) {
+        const linkLines = resolvedLinks.map(l => `- ${l.label} : ${l.url}`).join('\n')
+        fullAnswer = `${answerText}\n\n📎 Documents utiles :\n${linkLines}`
+      }
+
       const msgId = crypto.randomUUID()
       const assistantMsg: ChatMessage = {
         id: msgId,
         conversation_id: convId,
         role: 'assistant',
-        content: answerText,
+        content: fullAnswer,
         sources: [],
         created_at: new Date().toISOString(),
       }
 
       // Typing effect: show answer progressively (word by word)
-      if (!fromCache && answerText.length > 50) {
+      if (!fromCache && fullAnswer.length > 50) {
         streamingRef.current = true
         setMessages(m => [...m, { ...assistantMsg, content: '' }])
-        const words = answerText.split(/(\s+)/)
+        const words = fullAnswer.split(/(\s+)/)
         let displayed = ''
         for (let w = 0; w < words.length; w++) {
           displayed += words[w]
@@ -368,14 +378,6 @@ export default function ChatPage() {
       } else {
         setMessages(m => [...m, assistantMsg])
       }
-
-      // Resolve download links: from [Source:...] refs + equipment mentioned in answer
-      const sourceRefs = extractSourceRefs(answerText)
-      resolveAllLinks(sourceRefs, docs, answerText).then(links => {
-        if (links.length > 0) {
-          setDownloadLinks(prev => ({ ...prev, [assistantMsg.id]: links }))
-        }
-      })
 
       // Save assistant message
       await supabase.from('rag_messages').insert({
@@ -482,26 +484,6 @@ export default function ChatPage() {
                         <span className="text-[10px]">({Math.round(s.similarity * 100)}%)</span>
                       </div>
                     ))}
-                  </div>
-                )}
-                {downloadLinks[msg.id] && downloadLinks[msg.id].length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-border/30 space-y-1.5">
-                    <div className="text-xs font-medium opacity-70">Documents sources :</div>
-                    {downloadLinks[msg.id].map((link, i) => {
-                      const isWeb = link.url.startsWith('https://service.') || link.url.startsWith('https://www.')
-                      return (
-                        <a
-                          key={i}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover hover:underline"
-                        >
-                          {isWeb ? <ExternalLink size={12} /> : <Download size={12} />}
-                          <span>{link.label}</span>
-                        </a>
-                      )
-                    })}
                   </div>
                 )}
               </div>
