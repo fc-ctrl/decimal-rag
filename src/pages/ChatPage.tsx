@@ -112,6 +112,20 @@ async function resolveSourceLinks(refs: string[], docs: Document[], answerText: 
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
 
+// Clean label from URL: extract filename for PDFs, readable slug for pages
+function urlLabel(url: string): string {
+  const pdfMatch = url.match(/\/([^/]+\.pdf)/i)
+  if (pdfMatch) {
+    return pdfMatch[1].replace(/[_-]/g, ' ').replace(/\.pdf$/i, '').replace(/\b\w/g, c => c.toUpperCase()) + ' (PDF)'
+  }
+  const slug = url.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
+  if (slug.includes('wp-content')) {
+    const filename = slug.split('/').pop() || slug
+    return filename.replace(/[_-]/g, ' ').replace(/\.\w+$/, '').replace(/\b\w/g, c => c.toUpperCase()) + ' (PDF)'
+  }
+  return slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 // Common pool words to ignore when matching URLs (too generic, match everything)
 const URL_STOP_WORDS = new Set(['piscine','electrolyseur','pompe','filtre','votre','comment','guide','bien','pour',
   'dans','avec','plus','causes','solutions','complet','etape','conseils','chlore','traitement','fonctionnement'])
@@ -148,9 +162,7 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
         }
       } else if (doc.source_type === 'url') {
         seen.add(doc.id)
-        const slug = doc.source_ref.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
-        const label = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-        links.push({ label, url: doc.source_ref })
+        links.push({ label: urlLabel(doc.source_ref), url: doc.source_ref })
       }
     }
   }
