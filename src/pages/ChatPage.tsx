@@ -18,28 +18,52 @@ async function resolveSourceLinks(refs: string[], docs: Document[], answerText: 
   const links: SourceLink[] = []
   const seen = new Set<string>()
   const answerLower = answerText.toLowerCase()
+  const skipWords = new Set(['source','manuel','manual','installation','utilisation','document','technique','pour','votre','dans','avec','plus','pompe','piscine','poolex','chaleur','filtration'])
 
   for (const ref of refs) {
     const refLower = ref.toLowerCase()
-    const skipWords = new Set(['source','manuel','manual','installation','utilisation','document','technique','pour','votre','dans','avec','plus'])
     const refWords = refLower.split(/[\s'']+/).filter(w => w.length > 4 && !skipWords.has(w))
 
-    // Find ALL matching docs, then pick the best one
-    const candidates = docs.filter(d => {
+    // Strategy 1: Match by filename
+    const byTitle = docs.filter(d => {
       if (d.source_type !== 'upload') return false
-      const titleLower = d.title.toLowerCase()
-      return refWords.some(w => titleLower.includes(w.substring(0, 5)))
+      const tl = d.title.toLowerCase()
+      return refWords.some(w => tl.includes(w.substring(0, 5)))
     })
 
-    // Score candidates: prefer the one that matches version hints in the answer
-    let best = candidates[0] || null
-    if (candidates.length > 1) {
+    // Strategy 2: Match by equipment metadata (if answer mentions the model)
+    const byEquipment = docs.filter(d => {
+      if (d.source_type !== 'upload') return false
+      const meta = d.metadata as Record<string, string>
+      if (!meta?.equipment_model) return false
+      const model = meta.equipment_model.toLowerCase()
+      // Check if the source ref or answer mentions this equipment
+      return model.split(/\s+/).filter(w => w.length > 3).some(w => refLower.includes(w) || answerLower.includes(w))
+    })
+
+    // Merge candidates, prefer equipment matches
+    const allCandidates = [...new Map([...byEquipment, ...byTitle].map(d => [d.id, d])).values()]
+
+    // Score: equipment match > title match, and prefer version-specific
+    let best = allCandidates[0] || null
+    if (allCandidates.length > 1) {
+      // Prefer equipment-matched docs
+      const eqMatch = allCandidates.find(d => byEquipment.includes(d))
+      if (eqMatch) best = eqMatch
+
+      // Version hints for Vertigo
       const hasV2Hint = answerLower.includes('v2') || answerLower.includes('2024') || /\bE\d{2}\b/.test(answerText)
-      const hasV1Hint = answerLower.includes('v1') || answerLower.includes('2023') || /\b(code\s+)?0[3-9]\b/.test(answerLower)
-      for (const c of candidates) {
+      const hasV1Hint = answerLower.includes('v1') || answerLower.includes('2023')
+      for (const c of allCandidates) {
         const tl = c.title.toLowerCase()
-        if (hasV2Hint && (tl.includes('2') && tl.includes('vertigo'))) { best = c; break }
-        if (hasV1Hint && (tl.includes('1') && tl.includes('vertigo'))) { best = c; break }
+        if (hasV2Hint && tl.includes('2') && tl.includes('vertigo')) { best = c; break }
+        if (hasV1Hint && tl.includes('1') && tl.includes('vertigo')) { best = c; break }
+      }
+
+      // WiFi hints
+      if (answerLower.includes('wifi') || answerLower.includes('vp wifi')) {
+        const wifiDoc = allCandidates.find(d => d.title.toLowerCase().includes('wifi') || ((d.metadata as Record<string,string>)?.equipment_model || '').toLowerCase().includes('wifi'))
+        if (wifiDoc) best = wifiDoc
       }
     }
 
