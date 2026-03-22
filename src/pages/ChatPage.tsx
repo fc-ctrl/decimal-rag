@@ -312,15 +312,28 @@ export default function ChatPage() {
     })
 
     try {
+      // Build chatInput with context for short follow-up messages
+      let chatInput = input
+      if (imageData && catalogItems.length > 0) {
+        chatInput = `${input}\n\nEQUIPEMENTS CONNUS (compare la photo avec cette liste) :\n${catalogItems.map(c => `- ${c.brand} ${c.model} (${c.type})${c.visual_traits ? ' : ' + c.visual_traits : ''}`).join('\n')}`
+      } else if (input.trim().length < 40 && messages.length >= 2) {
+        // Short follow-up: inject context from last exchange
+        const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+        const lastUser = [...messages].reverse().find(m => m.role === 'user')
+        if (lastAssistant) {
+          // Extract equipment/topic keywords from last assistant message
+          const lastContent = lastAssistant.content.substring(0, 300)
+          chatInput = `(Contexte: la conversation portait sur: "${lastUser?.content || ''}" → "${lastContent.substring(0, 150)}...")\n\nNouvelle question: ${input}`
+        }
+      }
+
       const res = await fetch(CHAT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chatInput: imageData && catalogItems.length > 0
-            ? `${input}\n\nEQUIPEMENTS CONNUS (compare la photo avec cette liste) :\n${catalogItems.map(c => `- ${c.brand} ${c.model} (${c.type})${c.visual_traits ? ' : ' + c.visual_traits : ''}`).join('\n')}`
-            : input,
+          chatInput,
           sessionId: convId,
           ...(imageData ? { image: imageData.base64 } : {}),
         }),
