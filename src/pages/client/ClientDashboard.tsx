@@ -67,7 +67,7 @@ export default function ClientDashboard({ clientName, contactId, onNavigate, onL
         </button>
       </header>
 
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="w-full px-4 sm:px-8 lg:px-16 py-6 space-y-6">
         {/* Quick actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <button
