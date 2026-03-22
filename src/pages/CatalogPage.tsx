@@ -11,6 +11,7 @@ interface CatalogItem {
   type: string
   visual_traits: string | null
   photo_url: string | null
+  photos: { url: string; view: string }[]
   created_at: string
 }
 
@@ -20,9 +21,10 @@ export default function CatalogPage() {
   const [search, setSearch] = useState('')
   const [adding, setAdding] = useState(false)
   const [identifying, setIdentifying] = useState(false)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<{ url: string; view: string }[]>([])
   const [newItem, setNewItem] = useState({ brand: '', model: '', type: '', visual_traits: '' })
   const photoRef = useRef<HTMLInputElement>(null)
+  const addPhotoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadCatalog() }, [])
 
@@ -44,14 +46,15 @@ export default function CatalogPage() {
     const reader = new FileReader()
     reader.onload = async () => {
       const base64 = (reader.result as string).split(',')[1]
-      setPreview(reader.result as string)
+      const dataUrl = reader.result as string
+      setPhotos([{ url: dataUrl, view: 'face' }])
 
       try {
         const res = await fetch(CHAT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            chatInput: 'Identifie precisement cet equipement piscine. Donne : 1) Marque 2) Modele exact 3) Type (pompe a chaleur, electrolyseur, regulateur, filtre, pompe de filtration, volet) 4) Traits visuels distinctifs (couleur boitier, forme ecran, logo). Format: Marque: ... | Modele: ... | Type: ... | Traits: ...',
+            chatInput: 'Identifie precisement cet equipement piscine. Lis tous les textes visibles sur l appareil.',
             sessionId: 'catalog-' + Date.now(),
             image: base64,
           }),
@@ -62,7 +65,7 @@ export default function CatalogPage() {
         const brandMatch = answer.match(/[Mm]arque[:\s]*([^|\n]+)/)
         const modelMatch = answer.match(/[Mm]od[eè]le[:\s]*([^|\n]+)/)
         const typeMatch = answer.match(/[Tt]ype[:\s]*([^|\n]+)/)
-        const traitsMatch = answer.match(/[Tt]raits?[:\s]*([^|\n]+)/)
+        const traitsMatch = answer.match(/[Tt]raits?\s*(?:visuels)?[:\s]*([^|\n]+)/i)
 
         setNewItem({
           brand: brandMatch?.[1]?.trim() || '',
@@ -79,6 +82,17 @@ export default function CatalogPage() {
     if (photoRef.current) photoRef.current.value = ''
   }
 
+  function handleAddPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setPhotos(p => [...p, { url: reader.result as string, view: 'autre' }])
+    }
+    reader.readAsDataURL(file)
+    if (addPhotoRef.current) addPhotoRef.current.value = ''
+  }
+
   async function saveItem() {
     if (!newItem.brand || !newItem.model) return
     await supabase.from('rag_equipment_catalog').insert({
@@ -86,10 +100,11 @@ export default function CatalogPage() {
       model: newItem.model,
       type: newItem.type,
       visual_traits: newItem.visual_traits,
-      photo_url: preview,
+      photo_url: photos[0]?.url || null,
+      photos: photos,
     })
     setAdding(false)
-    setPreview(null)
+    setPhotos([])
     setNewItem({ brand: '', model: '', type: '', visual_traits: '' })
     loadCatalog()
   }
@@ -134,8 +149,33 @@ export default function CatalogPage() {
       {/* Add form */}
       {adding && (
         <div className="mb-6 bg-white rounded-xl border border-border p-5 space-y-4">
+          {/* Photos grid */}
+          <div className="flex gap-2 flex-wrap mb-4">
+            {photos.map((p, i) => (
+              <div key={i} className="relative">
+                <img src={p.url} alt={p.view} className="w-28 h-28 object-cover rounded-lg border border-border" />
+                <select
+                  value={p.view}
+                  onChange={e => setPhotos(photos.map((ph, j) => j === i ? { ...ph, view: e.target.value } : ph))}
+                  className="absolute bottom-1 left-1 right-1 text-[10px] bg-white/90 rounded px-1 py-0.5 border"
+                >
+                  <option value="face">Face</option>
+                  <option value="cote">Côté</option>
+                  <option value="dessus">Dessus</option>
+                  <option value="plaque">Plaque</option>
+                  <option value="ecran">Écran</option>
+                  <option value="autre">Autre</option>
+                </select>
+                <button onClick={() => setPhotos(photos.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">×</button>
+              </div>
+            ))}
+            <button onClick={() => addPhotoRef.current?.click()} className="w-28 h-28 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-text-muted hover:border-primary hover:text-primary">
+              <Camera size={20} />
+              <span className="text-[10px] mt-1">+ Vue</span>
+            </button>
+            <input ref={addPhotoRef} type="file" accept="image/*" className="hidden" onChange={handleAddPhoto} />
+          </div>
           <div className="flex gap-4">
-            {preview && <img src={preview} alt="Photo" className="w-32 h-32 object-cover rounded-lg border border-border shrink-0" />}
             <div className="flex-1 space-y-3">
               {identifying ? (
                 <div className="flex items-center gap-2 text-sm text-text-muted py-4">
@@ -174,7 +214,7 @@ export default function CatalogPage() {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={saveItem} disabled={!newItem.brand || !newItem.model} className="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover disabled:opacity-50">Enregistrer</button>
-                    <button onClick={() => { setAdding(false); setPreview(null) }} className="px-4 py-2 border border-border rounded-lg text-sm hover:bg-gray-50">Annuler</button>
+                    <button onClick={() => { setAdding(false); setPhotos([]) }} className="px-4 py-2 border border-border rounded-lg text-sm hover:bg-gray-50">Annuler</button>
                   </div>
                 </>
               )}
