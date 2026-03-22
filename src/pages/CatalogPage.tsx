@@ -27,28 +27,7 @@ async function analyzePhoto(base64: string): Promise<{ brand: string; model: str
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chatInput: `ETAPE 1 — LIRE le texte sur l'appareil :
-Lis CHAQUE mot/texte visible imprime ou grave sur l'appareil (nom de marque, nom de modele, etiquettes, inscriptions sur l'ecran). Liste-les tous.
-
-ETAPE 2 — IDENTIFIER a partir du texte lu :
-- La MARQUE est le texte du logo (ex: POOLEX, HAYWARD, etc.)
-- Le MODELE est le nom du produit ecrit sur l'appareil (ex: Aqualyser, Vertigo, Variline, MaxFlo, etc.)
-- NE JAMAIS inventer un nom de modele. Si tu lis "Aqualyser" sur l'appareil, le modele EST "Aqualyser", PAS autre chose.
-
-ETAPE 3 — CLASSIFIER le type d'equipement :
-- Electrolyseur = appareil avec cellule de sel, sondes pH/ORP, production de chlore
-- Pompe a chaleur = gros boitier avec ventilateur, echangeur thermique
-- Pompe de filtration = moteur avec turbine hydraulique
-- Regulateur = boitier de controle pH/chlore sans cellule de production
-
-REGLE ABSOLUE : Le modele dans ta reponse DOIT correspondre au texte que tu as LU sur l'appareil. Si tu as lu "Aqualyser", tu reponds "Aqualyser".
-
-Reponds STRICTEMENT dans ce format :
-Marque: [marque lue sur l'appareil]
-Modele: [modele lu sur l'appareil]
-Type: [pompe de filtration/pompe a chaleur/electrolyseur/regulateur/filtre/volet/robot/coffret de commande]
-Traits: [couleurs, forme, details distinctifs]
-Description: [description complete de ce que tu vois sur cette photo en 2-3 phrases]`,
+        chatInput: 'ETAPE 1 — Lis CHAQUE texte visible sur l\'appareil (marque, modele, etiquettes, ecran).\nETAPE 2 — La MARQUE = texte du logo. Le MODELE = nom du produit ecrit sur l\'appareil. NE JAMAIS inventer. Si tu lis "Aqualyser", le modele EST "Aqualyser".\nETAPE 3 — Classifier : Electrolyseur = cellule sel + sondes pH/ORP. Pompe a chaleur = gros boitier + ventilateur. Pompe de filtration = moteur + turbine. Regulateur = controle pH sans cellule.\nREGLE : Le modele DOIT correspondre au texte LU sur l\'appareil.\nReponds STRICTEMENT :\nMarque: [marque lue]\nModele: [modele lu]\nType: [pompe de filtration/pompe a chaleur/electrolyseur/regulateur/filtre/volet/robot/coffret de commande]\nTraits: [couleurs, forme, details distinctifs]\nDescription: [description en 2-3 phrases]',
         sessionId: 'catalog-analyze-' + Date.now(),
         image: base64,
       }),
