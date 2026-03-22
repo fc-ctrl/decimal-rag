@@ -97,9 +97,9 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
     if (!seen.has(l.url)) { seen.add(l.url); links.push(l) }
   }
 
-  // 2. Equipment-associated PDFs
-  const uploadDocs = allDocs.filter(d => d.source_type === 'upload' && d.source_ref)
-  for (const doc of uploadDocs) {
+  // 2. Equipment-associated documents (PDFs + URLs)
+  const docsWithRef = allDocs.filter(d => d.source_ref)
+  for (const doc of docsWithRef) {
     if (seen.has(doc.id)) continue
     const meta = doc.metadata as Record<string, unknown>
     const eqModel = ((meta?.equipment_model as string) || '').toLowerCase()
@@ -110,15 +110,23 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
       return words.length > 0 && words.every(w => answerLower.includes(w))
     })
     if (mentioned) {
-      const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
-      if (data?.signedUrl) {
+      if (doc.source_type === 'upload') {
+        const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
+        if (data?.signedUrl) {
+          seen.add(doc.id)
+          links.push({ label: `${doc.title} (${(meta.equipment_brand as string) || ''} ${eqModel})`.trim(), url: data.signedUrl })
+        }
+      } else if (doc.source_type === 'url') {
         seen.add(doc.id)
-        links.push({ label: `${doc.title} (${(meta.equipment_brand as string) || ''} ${eqModel})`.trim(), url: data.signedUrl })
+        const slug = doc.source_ref.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
+        const label = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+        links.push({ label, url: doc.source_ref })
       }
     }
   }
 
   // 3. PDF matching by title keywords (even without equipment metadata)
+  const uploadDocs = allDocs.filter(d => d.source_type === 'upload' && d.source_ref)
   for (const doc of uploadDocs) {
     if (seen.has(doc.id)) continue
     const titleWords = doc.title.toLowerCase().replace(/[._-]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !URL_STOP_WORDS.has(w))
@@ -133,7 +141,7 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
     }
   }
 
-  // 4. URL documents (service.cosy-piscine.com etc.) — strict matching
+  // 4. URL documents — strict keyword matching (fallback if not equipment-linked)
   const urlDocs = allDocs.filter(d => d.source_type === 'url' && d.source_ref)
   const urlScored: { doc: typeof urlDocs[0]; score: number }[] = []
   for (const doc of urlDocs) {
@@ -147,7 +155,6 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
       urlScored.push({ doc, score: matchCount + ratio })
     }
   }
-  // Sort by score, take top 3
   urlScored.sort((a, b) => b.score - a.score)
   for (const { doc } of urlScored.slice(0, 3)) {
     seen.add(doc.id)
