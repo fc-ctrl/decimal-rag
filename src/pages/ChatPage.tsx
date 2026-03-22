@@ -175,14 +175,14 @@ export default function ChatPage() {
       let chatInput = input
       if (imageData && catalogItems.length > 0) {
         chatInput = `${input}\n\nEQUIPEMENTS CONNUS (compare la photo avec cette liste) :\n${catalogItems.map(c => `- ${c.brand} ${c.model} (${c.type})${c.visual_traits ? ' : ' + c.visual_traits : ''}`).join('\n')}`
-      } else if (input.trim().length < 40 && messages.length >= 2) {
-        // Short follow-up: inject context from last exchange
+      } else if (input.trim().length < 15 && messages.length >= 2) {
+        // Very short follow-up only (oui, non, notice?, et le pH?)
+        // Don't inject context for topic changes like "volet immergé"
         const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
         const lastUser = [...messages].reverse().find(m => m.role === 'user')
         if (lastAssistant) {
-          // Extract equipment/topic keywords from last assistant message
           const lastContent = lastAssistant.content.substring(0, 300)
-          chatInput = `(Contexte: la conversation portait sur: "${lastUser?.content || ''}" → "${lastContent.substring(0, 150)}...")\n\nNouvelle question: ${input}`
+          chatInput = `(Contexte: "${lastUser?.content || ''}" → "${lastContent.substring(0, 150)}...")\n\n${input}`
         }
       }
 
