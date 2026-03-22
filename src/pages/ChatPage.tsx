@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { Send, Plus, MessageSquare, Trash2, FileText, Download } from 'lucide-react'
+import { Send, Plus, MessageSquare, Trash2, FileText, Download, Camera } from 'lucide-react'
 import type { ChatConversation, ChatMessage, Document } from '@/types'
 
 interface SourceLink {
@@ -67,6 +67,8 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false)
   const [docs, setDocs] = useState<Document[]>([])
   const [downloadLinks, setDownloadLinks] = useState<Record<string, SourceLink[]>>({})
+  const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null)
+  const photoRef = useRef<HTMLInputElement>(null)
   const streamingRef = useRef(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -135,6 +137,20 @@ export default function ChatPage() {
     }
   }
 
+  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1]
+      const preview = reader.result as string
+      setPendingImage({ base64, preview })
+      if (!input.trim()) setInput('Identifie cet équipement piscine')
+    }
+    reader.readAsDataURL(file)
+    if (photoRef.current) photoRef.current.value = ''
+  }
+
   async function sendMessage() {
     if (!input.trim() || sending) return
 
@@ -155,16 +171,20 @@ export default function ChatPage() {
       setConversations(c => [data, ...c])
     }
 
+    const imageData = pendingImage
+    const userContent = imageData ? `📷 ${input}` : input
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       conversation_id: convId,
       role: 'user',
-      content: input,
+      content: userContent,
       sources: [],
       created_at: new Date().toISOString(),
     }
     setMessages(m => [...m, userMsg])
     setInput('')
+    setPendingImage(null)
     setSending(true)
 
     // Save user message
@@ -182,8 +202,9 @@ export default function ChatPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          chatInput: userMsg.content,
+          chatInput: input,
           sessionId: convId,
+          ...(imageData ? { image: imageData.base64 } : {}),
         }),
       })
       const data = await res.json()
@@ -370,13 +391,29 @@ export default function ChatPage() {
 
         {/* Input */}
         <div className="p-4 border-t border-border bg-white">
+          {pendingImage && (
+            <div className="max-w-3xl mx-auto mb-2 flex items-center gap-2">
+              <img src={pendingImage.preview} alt="Photo" className="w-16 h-16 object-cover rounded-lg border border-border" />
+              <span className="text-xs text-text-muted">Photo prête à envoyer</span>
+              <button onClick={() => setPendingImage(null)} className="text-xs text-danger hover:underline">Retirer</button>
+            </div>
+          )}
           <div className="flex gap-2 max-w-3xl mx-auto">
+            <button
+              onClick={() => photoRef.current?.click()}
+              disabled={sending}
+              className="px-3 py-2.5 border border-border rounded-xl text-text-muted hover:bg-gray-50 hover:text-primary disabled:opacity-50 transition-colors"
+              title="Envoyer une photo d'équipement"
+            >
+              <Camera size={18} />
+            </button>
+            <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-              placeholder="Posez une question sur vos documents..."
+              placeholder={pendingImage ? "Décrivez votre problème ou envoyez directement..." : "Posez une question sur vos documents..."}
               className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               disabled={sending}
             />

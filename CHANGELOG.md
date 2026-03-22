@@ -5,6 +5,14 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et [Se
 
 ---
 
+## [1.2.0] — 2026-03-22
+
+### Ajouté
+- **Reconnaissance photo d'équipement** : bouton caméra dans le chat, le client photographie son matériel, GPT-4o Vision identifie marque/modèle/type, puis le RAG fournit la documentation correspondante
+- **Cache sémantique** : les questions similaires (cosine > 0.88) obtiennent une réponse instantanée (~800ms) depuis le cache. Embedding de la question stocké dans `rag_cache.query_embedding`
+
+---
+
 ## [1.1.0] — 2026-03-21
 
 ### Ajouté
