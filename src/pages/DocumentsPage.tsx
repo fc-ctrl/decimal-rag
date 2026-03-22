@@ -392,25 +392,50 @@ export default function DocumentsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {/* Equipment association */}
-                <select
-                  value={(doc.metadata as Record<string, string>)?.equipment_id || ''}
-                  onChange={async (e) => {
-                    const eqId = e.target.value
-                    const eq = catalogItems.find(c => c.id === eqId)
-                    const meta = { ...(doc.metadata || {}), equipment_id: eqId || undefined, equipment_brand: eq?.brand, equipment_model: eq?.model, equipment_type: eq?.type }
-                    if (!eqId) { delete (meta as Record<string, unknown>).equipment_id; delete (meta as Record<string, unknown>).equipment_brand; delete (meta as Record<string, unknown>).equipment_model; delete (meta as Record<string, unknown>).equipment_type }
-                    await supabase.from('rag_documents').update({ metadata: meta }).eq('id', doc.id)
-                    setDocuments(d => d.map(x => x.id === doc.id ? { ...x, metadata: meta } : x))
-                  }}
-                  className="text-[10px] px-1.5 py-1 border border-border rounded bg-white max-w-[140px] text-text-muted"
-                  title="Associer à un équipement"
-                >
-                  <option value="">— Équipement —</option>
-                  {catalogItems.map(c => (
-                    <option key={c.id} value={c.id}>{c.brand} {c.model}</option>
-                  ))}
-                </select>
+                {/* Equipment association - multi select */}
+                {(() => {
+                  const meta = (doc.metadata || {}) as Record<string, unknown>
+                  const equipIds: string[] = Array.isArray(meta.equipment_ids) ? meta.equipment_ids as string[] : meta.equipment_id ? [meta.equipment_id as string] : []
+                  const toggleEquip = async (eqId: string) => {
+                    const newIds = equipIds.includes(eqId) ? equipIds.filter(id => id !== eqId) : [...equipIds, eqId]
+                    const eqs = newIds.map(id => catalogItems.find(c => c.id === id)).filter(Boolean)
+                    const newMeta = {
+                      ...meta,
+                      equipment_ids: newIds,
+                      equipment_id: newIds[0] || undefined,
+                      equipment_brand: eqs[0]?.brand,
+                      equipment_model: eqs.map(e => e!.model).join(' / '),
+                      equipment_type: eqs[0]?.type,
+                    }
+                    if (newIds.length === 0) { Object.assign(newMeta, { equipment_ids: [], equipment_id: '', equipment_brand: '', equipment_model: '', equipment_type: '' }) }
+                    await supabase.from('rag_documents').update({ metadata: newMeta }).eq('id', doc.id)
+                    setDocuments(d => d.map(x => x.id === doc.id ? { ...x, metadata: newMeta } : x))
+                  }
+                  return (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {equipIds.length > 0 ? (
+                        equipIds.map(eqId => {
+                          const eq = catalogItems.find(c => c.id === eqId)
+                          return eq ? (
+                            <span key={eqId} onClick={() => toggleEquip(eqId)} className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded cursor-pointer hover:bg-primary/20" title="Cliquer pour retirer">
+                              {eq.model} ×
+                            </span>
+                          ) : null
+                        })
+                      ) : null}
+                      <select
+                        value=""
+                        onChange={e => { if (e.target.value) toggleEquip(e.target.value) }}
+                        className="text-[9px] px-1 py-0.5 border border-border rounded bg-white text-text-muted max-w-[100px]"
+                      >
+                        <option value="">{equipIds.length > 0 ? '+' : '— Équip. —'}</option>
+                        {catalogItems.filter(c => !equipIds.includes(c.id)).map(c => (
+                          <option key={c.id} value={c.id}>{c.model}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                })()}
                 <span className={`flex items-center gap-1 text-xs ${status.color}`}>
                   <StatusIcon size={14} className={doc.status === 'processing' ? 'animate-spin' : ''} />
                   {status.label}

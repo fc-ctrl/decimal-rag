@@ -95,21 +95,29 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
     if (!seen.has(l.url)) { seen.add(l.url); links.push(l) }
   }
 
-  // 2. Equipment-associated PDFs: if the answer mentions a product that has a PDF with equipment metadata
+  // 2. Equipment-associated PDFs: if the answer mentions a product that has a PDF linked
   for (const doc of uploadDocs) {
     if (seen.has(doc.id)) continue
-    const meta = doc.metadata as Record<string, string>
-    const model = (meta?.equipment_model || '').toLowerCase()
-    if (!model) continue
+    const meta = doc.metadata as Record<string, unknown>
 
-    // Check if answer mentions this equipment (all significant words must appear)
-    const modelWords = model.split(/\s+/).filter(w => w.length > 2)
-    const mentioned = modelWords.length > 0 && modelWords.every(w => answerLower.includes(w))
+    // Get all equipment models associated with this doc
+    const eqModel = ((meta?.equipment_model as string) || '').toLowerCase()
+    if (!eqModel) continue
+
+    // Split multi-model (e.g. "Aqualyser TOTAL / Aqualyser FLEX")
+    const models = eqModel.split('/').map(m => m.trim()).filter(Boolean)
+
+    // Check if answer mentions any of these equipment models
+    const mentioned = models.some(model => {
+      const words = model.split(/\s+/).filter(w => w.length > 2)
+      return words.length > 0 && words.every(w => answerLower.includes(w))
+    })
+
     if (mentioned) {
       const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
       if (data?.signedUrl) {
         seen.add(doc.id)
-        links.push({ label: `${doc.title} (${meta.equipment_brand || ''} ${meta.equipment_model || ''})`.trim(), url: data.signedUrl })
+        links.push({ label: `${doc.title} (${(meta.equipment_brand as string) || ''} ${eqModel})`.trim(), url: data.signedUrl })
       }
     }
   }
