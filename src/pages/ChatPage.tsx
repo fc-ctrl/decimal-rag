@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/lib/AuthContext'
 import { supabase } from '@/lib/supabase'
-import { Send, Plus, MessageSquare, Trash2, FileText, Download, Camera } from 'lucide-react'
+import { Send, Plus, MessageSquare, Trash2, FileText, Download, Camera, ExternalLink } from 'lucide-react'
 import type { ChatConversation, ChatMessage, Document } from '@/types'
 
 interface SourceLink {
@@ -82,43 +82,55 @@ async function resolveSourceLinks(refs: string[], docs: Document[], answerText: 
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
 
-// Find all relevant PDFs: from [Source:] refs + equipment mentioned in answer + all upload docs matching answer keywords
+// Find all relevant docs: PDFs (signed URL) + web pages (direct link)
 async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: string): Promise<SourceLink[]> {
   const links: SourceLink[] = []
   const seen = new Set<string>()
   const answerLower = answerText.toLowerCase()
-  const uploadDocs = allDocs.filter(d => d.source_type === 'upload' && d.source_ref)
 
-  // 1. Source ref matching (from [Source: ...] tags)
+  // 1. Source ref matching (from [Source: ...] tags) — PDFs only
   const refLinks = await resolveSourceLinks(refs, allDocs, answerText)
   for (const l of refLinks) {
     if (!seen.has(l.url)) { seen.add(l.url); links.push(l) }
   }
 
-  // 2. Equipment-associated PDFs: if the answer mentions a product that has a PDF linked
+  // 2. Equipment-associated PDFs
+  const uploadDocs = allDocs.filter(d => d.source_type === 'upload' && d.source_ref)
   for (const doc of uploadDocs) {
     if (seen.has(doc.id)) continue
     const meta = doc.metadata as Record<string, unknown>
-
-    // Get all equipment models associated with this doc
     const eqModel = ((meta?.equipment_model as string) || '').toLowerCase()
     if (!eqModel) continue
-
-    // Split multi-model (e.g. "Aqualyser TOTAL / Aqualyser FLEX")
     const models = eqModel.split('/').map(m => m.trim()).filter(Boolean)
-
-    // Check if answer mentions any of these equipment models
     const mentioned = models.some(model => {
       const words = model.split(/\s+/).filter(w => w.length > 2)
       return words.length > 0 && words.every(w => answerLower.includes(w))
     })
-
     if (mentioned) {
       const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
       if (data?.signedUrl) {
         seen.add(doc.id)
         links.push({ label: `${doc.title} (${(meta.equipment_brand as string) || ''} ${eqModel})`.trim(), url: data.signedUrl })
       }
+    }
+  }
+
+  // 3. URL documents (service.cosy-piscine.com etc.) — match by URL slug keywords
+  const urlDocs = allDocs.filter(d => d.source_type === 'url' && d.source_ref)
+  for (const doc of urlDocs) {
+    if (seen.has(doc.id)) continue
+    const url = doc.source_ref.toLowerCase()
+    const meta = doc.metadata as Record<string, unknown>
+    const slug = url.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
+    const slugWords = slug.split(/[-_/]/).filter(w => w.length > 3)
+    const matchCount = slugWords.filter(w => answerLower.includes(w)).length
+    const metaModel = ((meta?.model as string) || '').toLowerCase()
+    const modelMatch = metaModel && metaModel.split(/\s+/).filter(w => w.length > 3).some(w => answerLower.includes(w))
+
+    if (matchCount >= 2 || (matchCount >= 1 && modelMatch)) {
+      seen.add(doc.id)
+      const label = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      links.push({ label, url: doc.source_ref })
     }
   }
 
@@ -148,7 +160,6 @@ export default function ChatPage() {
     const { data } = await supabase
       .from('rag_documents')
       .select('*')
-      .eq('source_type', 'upload')
       .eq('status', 'ready')
     setDocs(data || [])
   }
@@ -423,18 +434,21 @@ export default function ChatPage() {
                 {downloadLinks[msg.id] && downloadLinks[msg.id].length > 0 && (
                   <div className="mt-3 pt-2 border-t border-border/30 space-y-1.5">
                     <div className="text-xs font-medium opacity-70">Documents sources :</div>
-                    {downloadLinks[msg.id].map((link, i) => (
-                      <a
-                        key={i}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover hover:underline"
-                      >
-                        <Download size={12} />
-                        <span>{link.label}</span>
-                      </a>
-                    ))}
+                    {downloadLinks[msg.id].map((link, i) => {
+                      const isWeb = link.url.startsWith('https://service.') || link.url.startsWith('https://www.')
+                      return (
+                        <a
+                          key={i}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover hover:underline"
+                        >
+                          {isWeb ? <ExternalLink size={12} /> : <Download size={12} />}
+                          <span>{link.label}</span>
+                        </a>
+                      )
+                    })}
                   </div>
                 )}
               </div>
