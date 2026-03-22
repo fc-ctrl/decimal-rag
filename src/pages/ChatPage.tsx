@@ -82,12 +82,15 @@ async function resolveSourceLinks(refs: string[], docs: Document[], answerText: 
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
 
+// Common pool words to ignore when matching URLs (too generic, match everything)
+const URL_STOP_WORDS = new Set(['piscine','electrolyseur','pompe','filtre','votre','comment','guide','bien','pour',
+  'dans','avec','plus','causes','solutions','complet','etape','conseils','chlore','traitement','fonctionnement'])
+
 // Find all relevant docs: PDFs (signed URL) + web pages (direct link)
 async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: string): Promise<SourceLink[]> {
   const links: SourceLink[] = []
   const seen = new Set<string>()
   const answerLower = answerText.toLowerCase()
-
   // 1. Source ref matching (from [Source: ...] tags) — PDFs only
   const refLinks = await resolveSourceLinks(refs, allDocs, answerText)
   for (const l of refLinks) {
@@ -115,23 +118,42 @@ async function resolveAllLinks(refs: string[], allDocs: Document[], answerText: 
     }
   }
 
-  // 3. URL documents (service.cosy-piscine.com etc.) — match by URL slug keywords
+  // 3. PDF matching by title keywords (even without equipment metadata)
+  for (const doc of uploadDocs) {
+    if (seen.has(doc.id)) continue
+    const titleWords = doc.title.toLowerCase().replace(/[._-]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !URL_STOP_WORDS.has(w))
+    if (titleWords.length === 0) continue
+    const titleMatch = titleWords.filter(w => answerLower.includes(w)).length
+    if (titleMatch >= 2 && titleMatch >= titleWords.length * 0.4) {
+      const { data } = await supabase.storage.from('rag-documents').createSignedUrl(doc.source_ref, 3600)
+      if (data?.signedUrl) {
+        seen.add(doc.id)
+        links.push({ label: doc.title, url: data.signedUrl })
+      }
+    }
+  }
+
+  // 4. URL documents (service.cosy-piscine.com etc.) — strict matching
   const urlDocs = allDocs.filter(d => d.source_type === 'url' && d.source_ref)
+  const urlScored: { doc: typeof urlDocs[0]; score: number }[] = []
   for (const doc of urlDocs) {
     if (seen.has(doc.id)) continue
-    const url = doc.source_ref.toLowerCase()
-    const meta = doc.metadata as Record<string, unknown>
-    const slug = url.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
-    const slugWords = slug.split(/[-_/]/).filter(w => w.length > 3)
+    const slug = doc.source_ref.toLowerCase().replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
+    const slugWords = slug.split(/[-_/]/).filter(w => w.length > 3 && !URL_STOP_WORDS.has(w))
+    if (slugWords.length === 0) continue
     const matchCount = slugWords.filter(w => answerLower.includes(w)).length
-    const metaModel = ((meta?.model as string) || '').toLowerCase()
-    const modelMatch = metaModel && metaModel.split(/\s+/).filter(w => w.length > 3).some(w => answerLower.includes(w))
-
-    if (matchCount >= 2 || (matchCount >= 1 && modelMatch)) {
-      seen.add(doc.id)
-      const label = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-      links.push({ label, url: doc.source_ref })
+    const ratio = matchCount / slugWords.length
+    if (matchCount >= 2 && ratio >= 0.5) {
+      urlScored.push({ doc, score: matchCount + ratio })
     }
+  }
+  // Sort by score, take top 3
+  urlScored.sort((a, b) => b.score - a.score)
+  for (const { doc } of urlScored.slice(0, 3)) {
+    seen.add(doc.id)
+    const slug = doc.source_ref.replace(/https?:\/\/[^/]+\//, '').replace(/\/$/, '')
+    const label = slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    links.push({ label, url: doc.source_ref })
   }
 
   return links
