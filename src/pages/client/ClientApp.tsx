@@ -52,7 +52,7 @@ export default function ClientApp() {
     case 'sav':
       return <ClientSav contactId={contactId} onBack={() => setPage('dashboard')} />
     case 'calculator':
-      return <ClientCalculator onOpenChat={() => { setPage('chat') }} />
+      return <ClientCalculator contactId={contactId} onOpenChat={() => { setPage('chat') }} onBack={() => setPage('dashboard')} />
     default:
       return <ClientDashboard clientName={clientName} contactId={contactId} onNavigate={setPage} onLogout={handleLogout} />
   }

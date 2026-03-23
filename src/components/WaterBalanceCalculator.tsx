@@ -53,11 +53,18 @@ function lsiColor(lsi: number): string {
 interface Props {
   showHistory?: boolean
   onOpenChat?: (message: string) => void
+  defaultVolume?: number
+  defaultElectrolyser?: boolean
+  defaultSelElectrolyseur?: number
 }
 
-export default function WaterBalanceCalculator({ showHistory = false, onOpenChat }: Props) {
-  const [params, setParams] = useState<WaterParams>(DEFAULT_PARAMS)
-  const [showSel, setShowSel] = useState(false)
+export default function WaterBalanceCalculator({ showHistory = false, onOpenChat, defaultVolume, defaultElectrolyser, defaultSelElectrolyseur }: Props) {
+  const [params, setParams] = useState<WaterParams>({
+    ...DEFAULT_PARAMS,
+    ...(defaultVolume ? { volume: defaultVolume } : {}),
+    ...(defaultSelElectrolyseur ? { selElectrolyseur: defaultSelElectrolyseur } : {}),
+  })
+  const [showSel, setShowSel] = useState(defaultElectrolyser ?? false)
   const [showDimensions, setShowDimensions] = useState(false)
   const [dims, setDims] = useState({ l: 8, w: 4, d: 1.5 })
   const [history, setHistory] = useState<{ date: string; params: WaterParams; lsi: number }[]>([])
