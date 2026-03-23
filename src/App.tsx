@@ -7,6 +7,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import HistoryPage from '@/pages/HistoryPage'
 import CatalogPage from '@/pages/CatalogPage'
 import ClientApp from '@/pages/client/ClientApp'
+import PublicCalculatorPage from '@/pages/PublicCalculatorPage'
 import { MessageSquare, FileText, Settings, LogOut, Brain, History, Package } from 'lucide-react'
 import packageJson from '../package.json'
 
@@ -97,6 +98,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/outils/equilibre-eau" element={<PublicCalculatorPage />} />
         <Route path="/client/*" element={<ClientRoute />} />
         <Route path="/*" element={
           <AuthProvider>

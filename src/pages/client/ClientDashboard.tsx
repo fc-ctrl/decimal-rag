@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MessageSquare, Wrench, Camera, LogOut, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { MessageSquare, Wrench, Camera, LogOut, AlertCircle, CheckCircle, Clock, Droplets } from 'lucide-react'
 
 const AIRTABLE_PROXY = 'https://n8n.decimal-ia.com/webhook/cosy-client-data'
 
@@ -69,7 +69,7 @@ export default function ClientDashboard({ clientName, contactId, onNavigate, onL
 
       <div className="w-full px-4 sm:px-8 lg:px-16 py-6 space-y-6">
         {/* Quick actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <button
             onClick={() => onNavigate('chat')}
             className="bg-white rounded-xl border border-gray-200 p-5 text-center hover:border-sky-300 hover:shadow-md transition-all"
@@ -93,6 +93,14 @@ export default function ClientDashboard({ clientName, contactId, onNavigate, onL
             <Wrench size={28} className="mx-auto mb-2 text-sky-600" />
             <div className="text-sm font-medium">Mes SAV</div>
             <div className="text-xs text-gray-400">{savTickets.length} demande{savTickets.length > 1 ? 's' : ''}</div>
+          </button>
+          <button
+            onClick={() => onNavigate('calculator')}
+            className="bg-white rounded-xl border border-gray-200 p-5 text-center hover:border-sky-300 hover:shadow-md transition-all"
+          >
+            <Droplets size={28} className="mx-auto mb-2 text-sky-600" />
+            <div className="text-sm font-medium">Analyse eau</div>
+            <div className="text-xs text-gray-400">Équilibre & dosages</div>
           </button>
         </div>
 

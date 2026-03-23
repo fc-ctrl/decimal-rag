@@ -4,6 +4,7 @@ import ClientDashboard from './ClientDashboard'
 import ClientEquipment from './ClientEquipment'
 import ClientChat from './ClientChat'
 import ClientSav from './ClientSav'
+import ClientCalculator from './ClientCalculator'
 
 export default function ClientApp() {
   const [token, setToken] = useState<string | null>(null)
@@ -50,6 +51,8 @@ export default function ClientApp() {
       return <ClientEquipment contactId={contactId} onBack={() => setPage('dashboard')} />
     case 'sav':
       return <ClientSav contactId={contactId} onBack={() => setPage('dashboard')} />
+    case 'calculator':
+      return <ClientCalculator onOpenChat={() => { setPage('chat') }} />
     default:
       return <ClientDashboard clientName={clientName} contactId={contactId} onNavigate={setPage} onLogout={handleLogout} />
   }
