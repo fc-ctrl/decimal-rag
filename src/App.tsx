@@ -6,9 +6,10 @@ import DocumentsPage from '@/pages/DocumentsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import HistoryPage from '@/pages/HistoryPage'
 import CatalogPage from '@/pages/CatalogPage'
+import ProductsPage from '@/pages/ProductsPage'
 import ClientApp from '@/pages/client/ClientApp'
 import PublicCalculatorPage from '@/pages/PublicCalculatorPage'
-import { MessageSquare, FileText, Settings, LogOut, Brain, History, Package } from 'lucide-react'
+import { MessageSquare, FileText, Settings, LogOut, Brain, History, Package, ShoppingBag } from 'lucide-react'
 import packageJson from '../package.json'
 
 function Layout() {
@@ -19,6 +20,7 @@ function Layout() {
     { to: '/documents', icon: FileText, label: 'Documents' },
     { to: '/history', icon: History, label: 'Historique' },
     { to: '/catalog', icon: Package, label: 'Catalogue' },
+    { to: '/products', icon: ShoppingBag, label: 'Produits' },
     { to: '/settings', icon: Settings, label: 'Paramètres' },
   ]
 
@@ -66,6 +68,7 @@ function Layout() {
           <Route path="/documents" element={<DocumentsPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
+          <Route path="/products" element={<ProductsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>

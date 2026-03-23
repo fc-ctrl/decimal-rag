@@ -1,6 +1,11 @@
-import { useState, useCallback } from 'react'
-import { Droplets, Thermometer, AlertTriangle, CheckCircle, FileText, MessageSquare } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { Droplets, Thermometer, AlertTriangle, CheckCircle, FileText, MessageSquare, Lightbulb, ShoppingBag } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import ExportReport from './ExportReport'
+
+interface ProductData { id: string; name: string; description: string | null; category: string; linked_param: string | null; unit: string; price: number | null; active: boolean }
+interface TipData { id: string; title: string; content: string; linked_param: string | null; linked_situation: string | null; active: boolean }
+interface SituationData { id: string; slug: string; label: string; description: string | null; guide_url: string | null; product_ids: string[]; active: boolean }
 
 interface WaterParams {
   temperature: number
@@ -57,6 +62,51 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
   const [dims, setDims] = useState({ l: 8, w: 4, d: 1.5 })
   const [history, setHistory] = useState<{ date: string; params: WaterParams; lsi: number }[]>([])
   const [showExport, setShowExport] = useState(false)
+  const [situation, setSituation] = useState('analyse_courante')
+  const [allProducts, setAllProducts] = useState<ProductData[]>([])
+  const [allTips, setAllTips] = useState<TipData[]>([])
+  const [allSituations, setAllSituations] = useState<SituationData[]>([])
+
+  useEffect(() => {
+    supabase.from('rag_products').select('*').eq('active', true).order('sort_order').then(r => setAllProducts(r.data || []))
+    supabase.from('rag_tips').select('*').eq('active', true).order('sort_order').then(r => setAllTips(r.data || []))
+    supabase.from('rag_water_situations').select('*').eq('active', true).order('sort_order').then(r => setAllSituations(r.data || []))
+  }, [])
+
+  // Get recommended products based on analysis + situation
+  const getRecommendedProducts = useCallback(() => {
+    const recommended: { product: ProductData; reason: string }[] = []
+    const sit = allSituations.find(s => s.slug === situation)
+    // Products from situation
+    if (sit?.product_ids.length) {
+      sit.product_ids.forEach(pid => {
+        const p = allProducts.find(pr => pr.id === pid)
+        if (p) recommended.push({ product: p, reason: sit.label })
+      })
+    }
+    // Products from analysis
+    if (params.tac < 80) { const p = allProducts.find(pr => pr.linked_param === 'tac_plus'); if (p && !recommended.find(r => r.product.id === p.id)) recommended.push({ product: p, reason: 'TAC bas' }) }
+    if (params.ph < 7.0) { const p = allProducts.find(pr => pr.linked_param === 'ph_plus'); if (p && !recommended.find(r => r.product.id === p.id)) recommended.push({ product: p, reason: 'pH bas' }) }
+    if (params.ph > 7.4) { const p = allProducts.find(pr => pr.linked_param === 'ph_moins'); if (p && !recommended.find(r => r.product.id === p.id)) recommended.push({ product: p, reason: 'pH haut' }) }
+    if (params.chlore < 1.0) { const p = allProducts.find(pr => pr.linked_param === 'chlore'); if (p && !recommended.find(r => r.product.id === p.id)) recommended.push({ product: p, reason: 'Chlore bas' }) }
+    if (params.chlore > 3.0) { const p = allProducts.find(pr => pr.category === 'complement' && pr.name.toLowerCase().includes('séquestrant')); if (p && !recommended.find(r => r.product.id === p.id)) recommended.push({ product: p, reason: 'Surchloration' }) }
+    if (showSel && params.sel < params.selElectrolyseur) { const p = allProducts.find(pr => pr.linked_param === 'sel'); if (p && !recommended.find(r => r.product.id === p.id)) recommended.push({ product: p, reason: 'Sel bas' }) }
+    return recommended
+  }, [params, situation, allProducts, allSituations, showSel])
+
+  // Get relevant tips
+  const getRelevantTips = useCallback(() => {
+    return allTips.filter(t => {
+      if (t.linked_situation && t.linked_situation !== situation) return false
+      if (t.linked_param) {
+        if (t.linked_param === 'tac' && params.tac >= 80 && params.tac <= 200) return false
+        if (t.linked_param === 'ph' && params.ph >= 7.0 && params.ph <= 7.4) return false
+        if (t.linked_param === 'chlore' && params.chlore >= 1.0 && params.chlore <= 1.5) return false
+        if (t.linked_param === 'stabilisant' && params.stabilisant >= 20 && params.stabilisant <= 75) return false
+      }
+      return true
+    }).slice(0, 3)
+  }, [allTips, params, situation])
 
   const lsi = calculateLSI(params)
   const lsiLabel = lsi < -0.3 ? 'Eau corrosive — risque de dégradation des équipements' : lsi > 0.3 ? 'Eau entartrante — risque de dépôts calcaires' : 'Eau équilibrée'
@@ -208,6 +258,22 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
         </div>
       </div>
 
+      {/* Situation */}
+      {allSituations.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+          <label className="text-xs text-gray-500 mb-2 block">Quel est votre besoin ?</label>
+          <div className="flex gap-2 flex-wrap">
+            {allSituations.map(s => (
+              <button key={s.slug} onClick={() => setSituation(s.slug)}
+                className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${situation === s.slug ? 'bg-blue-500 text-white border-blue-500' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-300'}`}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+          {(() => { const sit = allSituations.find(s => s.slug === situation); return sit?.description ? <p className="text-xs text-gray-400 mt-2">{sit.description}</p> : null })()}
+        </div>
+      )}
+
       {/* Volume */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <div className="flex items-center justify-between mb-1">
@@ -356,6 +422,60 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
           <p className={`text-sm mt-1 font-medium ${lsi >= -0.3 && lsi <= 0.3 ? 'text-green-600' : 'text-red-600'}`}>{lsiLabel}</p>
         </div>
       </div>
+
+      {/* Recommended Products */}
+      {(() => {
+        const recs = getRecommendedProducts()
+        if (recs.length === 0) return null
+        return (
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2"><ShoppingBag size={16} className="text-blue-500" /> Produits recommandés</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {recs.map((r, i) => (
+                <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
+                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-blue-500 text-xs font-bold">{i + 1}</div>
+                  <div className="flex-1">
+                    <div className="text-xs font-medium">{r.product.name}</div>
+                    <div className="text-[10px] text-gray-400">{r.reason}{r.product.price ? ` — ${r.product.price}€/${r.product.unit}` : ''}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Tips */}
+      {(() => {
+        const tips = getRelevantTips()
+        if (tips.length === 0) return null
+        return (
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 mb-4">
+            {tips.map((t, i) => (
+              <div key={i} className={`flex gap-2 ${i > 0 ? 'mt-3 pt-3 border-t border-amber-200' : ''}`}>
+                <Lightbulb size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <div className="text-xs font-semibold text-amber-700">{t.title}</div>
+                  <div className="text-xs text-amber-600 mt-0.5">{t.content}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
+
+      {/* Guide link for situation */}
+      {(() => {
+        const sit = allSituations.find(s => s.slug === situation)
+        if (!sit?.guide_url) return null
+        return (
+          <div className="bg-blue-50 rounded-xl border border-blue-200 p-3 mb-4 text-center">
+            <a href={sit.guide_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline font-medium">
+              📖 Consulter le guide Cosy Piscine : {sit.label}
+            </a>
+          </div>
+        )
+      })()}
 
       {/* Actions */}
       <div className="flex gap-2 flex-wrap mb-4">
