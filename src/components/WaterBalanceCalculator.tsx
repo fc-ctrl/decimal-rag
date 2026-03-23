@@ -485,7 +485,7 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
       </div>
 
       {/* Export modal */}
-      {showExport && <ExportReport params={params} lsi={lsi} lsiLabel={lsiLabel} showSel={showSel} onClose={() => setShowExport(false)} />}
+      {showExport && <ExportReport params={params} lsi={lsi} lsiLabel={lsiLabel} showSel={showSel} situation={situation} onClose={() => setShowExport(false)} />}
 
       {/* History */}
       {showHistory && history.length > 0 && (
