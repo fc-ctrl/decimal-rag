@@ -45,8 +45,8 @@ function fmtDose(grams: number): string {
 }
 
 function lsiColor(lsi: number): string {
-  if (lsi < -0.3 || lsi > 0.3) return '#ef4444'
-  if (lsi < -0.1 || lsi > 0.1) return '#f59e0b'
+  if (lsi < -1.0 || lsi > 0.4) return '#ef4444'
+  if (lsi < -0.3) return '#f59e0b'
   return '#22c55e'
 }
 
@@ -115,7 +115,7 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
   }, [allTips, params, situation])
 
   const lsi = calculateLSI(params)
-  const lsiLabel = lsi < -0.3 ? 'Eau corrosive — risque de dégradation des équipements' : lsi > 0.3 ? 'Eau entartrante — risque de dépôts calcaires' : 'Eau équilibrée'
+  const lsiLabel = lsi < -1.0 ? 'Eau corrosive — risque de dégradation des équipements' : lsi < -0.3 ? 'À surveiller' : lsi > 0.4 ? 'Eau entartrante — risque de dépôts calcaires' : 'Pas de risque'
 
   const update = useCallback((key: keyof WaterParams, value: number) => {
     setParams(p => ({ ...p, [key]: value }))
@@ -412,22 +412,26 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
       </div>
 
       {/* LSI Conclusion */}
+      {(() => {
+        const lsiBadge = lsi < -1.0
+          ? { label: 'Eau corrosive — risque de dégradation', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' }
+          : lsi < -0.3
+          ? { label: 'À surveiller', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a' }
+          : lsi > 0.4
+          ? { label: 'Eau entartrante — risque de dépôts', color: '#ef4444', bg: '#fef2f2', border: '#fecaca' }
+          : { label: 'Pas de risque', color: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0' }
+        return (
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
         <h2 className="text-sm font-semibold mb-4 text-center">Conclusion — Indice de Langelier (LSI)</h2>
-        <div className="relative h-10 bg-gradient-to-r from-red-400 via-amber-300 via-green-400 via-amber-300 to-red-400 rounded-full overflow-hidden mb-3">
-          <div className="absolute inset-0 flex items-center justify-around">
-            <span className="text-[10px] text-white font-medium drop-shadow">Corrosive</span>
-            <span className="text-[10px] text-white font-medium drop-shadow">Équilibrée</span>
-            <span className="text-[10px] text-white font-medium drop-shadow">Entartrante</span>
-          </div>
-          <div className="absolute top-0 w-1.5 h-full bg-white border-2 border-gray-800 rounded-full shadow-lg transition-all duration-300"
-            style={{ left: `${Math.max(2, Math.min(98, 50 + lsi * 40))}%`, transform: 'translateX(-50%)' }} />
-        </div>
-        <div className="text-center">
-          <span className="text-3xl font-bold" style={{ color: lsiColor(lsi) }}>{lsi > 0 ? '+' : ''}{lsi}</span>
-          <p className={`text-sm mt-1 font-medium ${lsi >= -0.3 && lsi <= 0.3 ? 'text-green-600' : 'text-red-600'}`}>{lsiLabel}</p>
+        <div className="flex items-center justify-center gap-4">
+          <span className="text-3xl font-bold" style={{ color: lsiBadge.color }}>{lsi > 0 ? '+' : ''}{lsi}</span>
+          <span className="px-4 py-2 rounded-full text-sm font-semibold" style={{ color: lsiBadge.color, background: lsiBadge.bg, border: `1px solid ${lsiBadge.border}` }}>
+            {lsiBadge.label}
+          </span>
         </div>
       </div>
+        )
+      })()}
 
       {/* Recommended Products */}
       {(() => {

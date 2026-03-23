@@ -74,7 +74,7 @@ function getAdvice(key: string, p: WaterParams): { status: string; text: string;
   }
 }
 
-function lsiColor(lsi: number) { return lsi < -0.3 || lsi > 0.3 ? '#ef4444' : lsi < -0.1 || lsi > 0.1 ? '#f59e0b' : '#22c55e' }
+function lsiColor(lsi: number) { return lsi < -1.0 || lsi > 0.4 ? '#ef4444' : lsi < -0.3 ? '#f59e0b' : '#22c55e' }
 
 export default function ExportReport({ params, lsi, lsiLabel, showSel, situation, onClose }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set(['tac', 'ph', 'th', 'chlore', 'stabilisant', ...(showSel ? ['sel'] : [])]))
@@ -129,7 +129,7 @@ export default function ExportReport({ params, lsi, lsiLabel, showSel, situation
 
     const lsiPct = Math.max(2, Math.min(98, 50 + lsi * 40))
     const lsiStatusColor = lsiColor(lsi)
-    const lsiCategory = lsi < -0.3 ? 'Eau corrosive' : lsi > 0.3 ? 'Eau entartrante' : 'Eau équilibrée'
+    const lsiCategory = lsi < -1.0 ? 'Eau corrosive' : lsi < -0.3 ? 'À surveiller' : lsi > 0.4 ? 'Eau entartrante' : 'Pas de risque'
 
     // Actions recommandées (tips)
     const actionsHtml = tips.length > 0 ? `
