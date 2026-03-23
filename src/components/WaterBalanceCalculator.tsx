@@ -34,30 +34,30 @@ function calculateLSI(p: WaterParams): number {
 function getRecommendation(param: string, p: WaterParams): Recommendation {
   switch (param) {
     case 'ph':
-      if (p.ph < 7.0) return { status: 'danger', message: 'pH trop bas — eau agressive', dosage: `Ajouter ${Math.round((7.2 - p.ph) * 10 * p.volume)} g de pH+ (carbonate de soude)` }
-      if (p.ph > 7.6) return { status: 'danger', message: 'pH trop haut — désinfection inefficace', dosage: `Ajouter ${Math.round((p.ph - 7.2) * 15 * p.volume)} g de pH- (bisulfate de sodium)` }
-      if (p.ph < 7.2 || p.ph > 7.4) return { status: 'warning', message: `pH à ${p.ph} — idéal entre 7.2 et 7.4` }
-      return { status: 'ok', message: 'pH parfait' }
+      if (p.ph < 7.0) return { status: 'danger', message: 'Le pH de votre bassin doit être compris entre 7.0 et 7.4. Corrigez d\'abord le TAC si celui-ci n\'est pas optimal.', dosage: `Ajouter ${Math.round((7.0 - p.ph) * 150 * p.volume)} g de pH+ en poudre, répartir en 3 doses toutes les 4h` }
+      if (p.ph > 7.4) return { status: 'warning', message: 'Le pH est trop haut, la désinfection perd en efficacité. Corrigez d\'abord le TAC si celui-ci n\'est pas optimal.', dosage: `Ajouter ${Math.round((p.ph - 7.2) * 150 * p.volume)} g de pH- en poudre, répartir en 3 doses toutes les 4h` }
+      return { status: 'ok', message: 'Le pH est dans la plage optimale (7.0 - 7.4)' }
     case 'tac':
-      if (p.tac < 80) return { status: 'danger', message: 'TAC trop bas — eau instable', dosage: `Ajouter ${Math.round((100 - p.tac) * 1.5 * p.volume / 1000)} kg de bicarbonate de soude` }
-      if (p.tac > 150) return { status: 'warning', message: 'TAC élevé — risque de tartre', dosage: 'Abaisser le pH à 7.0 pendant 48h puis remonter' }
-      return { status: 'ok', message: 'TAC correct' }
+      if (p.tac < 80) return { status: 'danger', message: 'Le TAC (alcalinité) doit être supérieur à 100 mg/l pour stabiliser le pH.', dosage: `Ajouter ${Math.round((100 - p.tac) * 1.5 * p.volume)} g de TAC+ ou Alcaplus, répartir en 3 doses toutes les 4h` }
+      if (p.tac > 200) return { status: 'warning', message: 'Le TAC est trop élevé. Ajustez le pH ou envisagez une dilution partielle.' }
+      return { status: 'ok', message: 'Le TAC est dans la plage optimale (80 - 200 mg/l)' }
     case 'th':
-      if (p.th < 150) return { status: 'warning', message: 'Eau douce — agressive pour les équipements', dosage: `Ajouter ${Math.round((200 - p.th) * p.volume / 1000)} kg de chlorure de calcium` }
-      if (p.th > 300) return { status: 'warning', message: 'Eau dure — risque de tartre' }
-      return { status: 'ok', message: 'TH correct' }
+      if (p.th < 150) return { status: 'warning', message: 'Eau douce — agressive pour les équipements et le liner.', dosage: `Ajouter ${Math.round((200 - p.th) * p.volume / 1000)} kg de chlorure de calcium` }
+      if (p.th > 300) return { status: 'warning', message: 'Eau dure — risque de dépôts calcaires sur les parois et équipements.' }
+      return { status: 'ok', message: 'Le TH est dans la plage optimale (150 - 300 mg/l)' }
     case 'chlore':
-      if (p.chlore < 0.5) return { status: 'danger', message: 'Chlore insuffisant', dosage: 'Chloration choc puis ajuster la production' }
-      if (p.chlore > 2.0) return { status: 'warning', message: 'Chlore élevé — irritant', dosage: 'Réduire la production' }
-      return { status: 'ok', message: 'Chlore correct' }
+      if (p.chlore < 1.0) return { status: 'danger', message: 'Le niveau de chlore est insuffisant pour assurer la désinfection.', dosage: `Ajouter ${Math.round((1.0 - p.chlore) * 1.5 * p.volume)} g de chlore granulé. Pour un électrolyseur, augmenter le % de production.` }
+      if (p.chlore > 1.5 && p.chlore <= 3.0) return { status: 'warning', message: 'ATTENTION — surchloration modérée. Réduisez l\'apport en chlore ou baissez le % de production de l\'électrolyseur.' }
+      if (p.chlore > 3.0) return { status: 'danger', message: 'ATTENTION — surchloration forte ! Nous vous conseillons de passer en magasin pour un diagnostic.' }
+      return { status: 'ok', message: 'Le niveau de chlore est dans la plage optimale (1.0 - 1.5 mg/l)' }
     case 'stabilisant':
-      if (p.stabilisant < 20) return { status: 'warning', message: 'Stabilisant bas — chlore se dégrade vite', dosage: `Ajouter ${Math.round((30 - p.stabilisant) * p.volume / 1000)} kg d'acide cyanurique` }
-      if (p.stabilisant > 75) return { status: 'danger', message: 'Sur-stabilisation — chlore inefficace', dosage: 'Vidange partielle (30%) + eau neuve' }
-      return { status: 'ok', message: 'Stabilisant correct' }
+      if (p.stabilisant < 20) return { status: 'warning', message: 'Stabilisant bas — le chlore se dégrade rapidement au soleil.', dosage: `Ajouter ${Math.round((30 - p.stabilisant) * p.volume / 1000)} kg d'acide cyanurique` }
+      if (p.stabilisant > 75) return { status: 'danger', message: 'Sur-stabilisation — le chlore devient inefficace même à forte dose. Seule solution : vidange partielle.', dosage: 'Vidange partielle (30%) et remplissage en eau neuve' }
+      return { status: 'ok', message: 'Le stabilisant est dans la plage optimale (20 - 75 mg/l)' }
     case 'sel':
-      if (p.sel < 3.0) return { status: 'warning', message: 'Sel bas pour électrolyseur', dosage: `Ajouter ${Math.round((4.0 - p.sel) * p.volume)} kg de sel piscine` }
-      if (p.sel > 5.0) return { status: 'warning', message: 'Sel élevé' }
-      return { status: 'ok', message: 'Sel correct' }
+      if (p.sel < 3.0) return { status: 'warning', message: 'Le taux de sel est insuffisant pour votre électrolyseur.', dosage: `Ajouter ${Math.round((4.0 - p.sel) * p.volume)} kg de sel spécial piscine` }
+      if (p.sel > 6.0) return { status: 'warning', message: 'Le taux de sel est trop élevé. Diluez avec de l\'eau fraîche.' }
+      return { status: 'ok', message: 'Le niveau de sel est dans la plage optimale' }
     default: return { status: 'ok', message: '' }
   }
 }
@@ -138,9 +138,11 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
 
   const chatMsg = `Analyse eau : pH=${params.ph}, TAC=${params.tac}, TH=${params.th}, chlore=${params.chlore}, stabilisant=${params.stabilisant}${showSel ? `, sel=${params.sel}` : ''}, temp=${params.temperature}°C, vol=${params.volume}m³. LSI=${lsi}. Conseils ?`
 
-  function Slider({ label, icon, value, min, max, step, unit, idealMin, idealMax, color, paramKey }: {
-    label: string; icon?: React.ReactNode; value: number; min: number; max: number; step: number; unit: string; idealMin: number; idealMax: number; color: string; paramKey: keyof WaterParams
+  function Slider({ label, icon, value, min, max, step, unit, idealMin, idealMax, paramKey }: {
+    label: string; icon?: React.ReactNode; value: number; min: number; max: number; step: number; unit: string; idealMin: number; idealMax: number; paramKey: keyof WaterParams
   }) {
+    const [editing, setEditing] = useState(false)
+    const [editVal, setEditVal] = useState('')
     const isOk = value >= idealMin && value <= idealMax
     const isWarn = !isOk && value >= idealMin * 0.7 && value <= idealMax * 1.3
     const valueColor = isOk ? 'text-green-600' : isWarn ? 'text-amber-600' : 'text-red-600'
@@ -149,9 +151,20 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-xs text-gray-500 flex items-center gap-1">{icon}{label}</label>
-          <span className={`text-sm font-semibold ${valueColor}`}>{value} {unit}</span>
+          {editing ? (
+            <input autoFocus type="number" value={editVal} min={min} max={max} step={step}
+              onChange={e => setEditVal(e.target.value)}
+              onBlur={() => { const v = parseFloat(editVal); if (!isNaN(v)) update(paramKey, Math.min(max, Math.max(min, v))); setEditing(false) }}
+              onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              className={`w-20 text-right text-sm font-semibold border border-blue-400 rounded px-1 py-0.5 outline-none ${valueColor}`}
+            />
+          ) : (
+            <button onClick={() => { setEditVal(String(value)); setEditing(true) }} className={`text-sm font-semibold ${valueColor} hover:underline cursor-text`} title="Cliquer pour saisir une valeur">
+              {value} {unit}
+            </button>
+          )}
         </div>
-        <input type="range" min={min} max={max} step={step} value={value} onChange={e => update(paramKey, +e.target.value)} className={`w-full ${color}`} style={{ accentColor: isOk ? '#22c55e' : isWarn ? '#f59e0b' : '#ef4444' }} />
+        <input type="range" min={min} max={max} step={step} value={value} onChange={e => update(paramKey, +e.target.value)} className="w-full" style={{ accentColor: isOk ? '#22c55e' : isWarn ? '#f59e0b' : '#ef4444' }} />
         <div className="flex justify-between text-[10px] text-gray-400">
           <span>{min} {unit}</span>
           <span className="text-green-600 font-medium">{idealMin}-{idealMax}</span>
@@ -198,19 +211,19 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
       {/* Main parameters grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="pH" value={params.ph} min={6.0} max={8.5} step={0.1} unit="" idealMin={7.2} idealMax={7.4} color="" paramKey="ph" />
+          <Slider label="pH" value={params.ph} min={6.0} max={8.5} step={0.05} unit="" idealMin={7.0} idealMax={7.4} paramKey="ph" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="TAC (alcalinité)" value={params.tac} min={0} max={300} step={10} unit="mg/l" idealMin={80} idealMax={150} color="" paramKey="tac" />
+          <Slider label="TAC (alcalinité)" value={params.tac} min={0} max={300} step={5} unit="mg/l" idealMin={80} idealMax={200} paramKey="tac" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="TH (dureté calcique)" value={params.th} min={0} max={500} step={10} unit="mg/l" idealMin={150} idealMax={300} color="" paramKey="th" />
+          <Slider label="TH (dureté calcique)" value={params.th} min={0} max={500} step={5} unit="mg/l" idealMin={150} idealMax={300} paramKey="th" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="Chlore libre" value={params.chlore} min={0} max={5} step={0.1} unit="mg/l" idealMin={0.5} idealMax={2.0} color="" paramKey="chlore" />
+          <Slider label="Chlore libre" value={params.chlore} min={0} max={5} step={0.1} unit="mg/l" idealMin={1.0} idealMax={1.5} paramKey="chlore" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="Stabilisant (acide cyanurique)" value={params.stabilisant} min={0} max={150} step={5} unit="mg/l" idealMin={20} idealMax={75} color="" paramKey="stabilisant" />
+          <Slider label="Stabilisant (acide cyanurique)" value={params.stabilisant} min={0} max={150} step={5} unit="mg/l" idealMin={20} idealMax={75} paramKey="stabilisant" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <label className="flex items-center gap-2 cursor-pointer mb-3">
@@ -218,7 +231,7 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
             <span className="text-xs text-gray-500">J'ai un électrolyseur au sel</span>
           </label>
           {showSel ? (
-            <Slider label="Sel" value={params.sel} min={0} max={8} step={0.5} unit="g/l" idealMin={3.0} idealMax={5.0} color="" paramKey="sel" />
+            <Slider label="Sel" value={params.sel} min={0} max={8} step={0.5} unit="g/l" idealMin={3.0} idealMax={5.0} paramKey="sel" />
           ) : (
             <div className="text-center text-xs text-gray-300 py-4">Cochez si vous avez un électrolyseur</div>
           )}
