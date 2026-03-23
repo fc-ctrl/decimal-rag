@@ -195,7 +195,7 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
             <label className="text-xs text-gray-500 flex items-center gap-1"><Droplets size={12} /> Volume</label>
             <span className="text-sm font-semibold text-blue-600">{params.volume} m³</span>
           </div>
-          <input type="range" min={10} max={150} step={5} value={params.volume} onChange={e => update('volume', +e.target.value)} className="w-full" style={{ accentColor: '#3b82f6' }} />
+          <input type="range" min={10} max={150} step={1} value={params.volume} onChange={e => update('volume', +e.target.value)} className="w-full" style={{ accentColor: '#3b82f6' }} />
           <div className="flex justify-between text-[10px] text-gray-400"><span>10 m³</span><span>150 m³</span></div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -211,19 +211,19 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
       {/* Main parameters grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="pH" value={params.ph} min={6.0} max={8.5} step={0.05} unit="" idealMin={7.0} idealMax={7.4} paramKey="ph" />
+          <Slider label="pH" value={params.ph} min={6.0} max={8.5} step={0.1} unit="" idealMin={7.0} idealMax={7.4} paramKey="ph" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="TAC (alcalinité)" value={params.tac} min={0} max={300} step={5} unit="mg/l" idealMin={80} idealMax={200} paramKey="tac" />
+          <Slider label="TAC (alcalinité)" value={params.tac} min={0} max={300} step={1} unit="mg/l" idealMin={80} idealMax={200} paramKey="tac" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="TH (dureté calcique)" value={params.th} min={0} max={500} step={5} unit="mg/l" idealMin={150} idealMax={300} paramKey="th" />
+          <Slider label="TH (dureté calcique)" value={params.th} min={0} max={500} step={1} unit="mg/l" idealMin={150} idealMax={300} paramKey="th" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <Slider label="Chlore libre" value={params.chlore} min={0} max={5} step={0.1} unit="mg/l" idealMin={1.0} idealMax={1.5} paramKey="chlore" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <Slider label="Stabilisant (acide cyanurique)" value={params.stabilisant} min={0} max={150} step={5} unit="mg/l" idealMin={20} idealMax={75} paramKey="stabilisant" />
+          <Slider label="Stabilisant (acide cyanurique)" value={params.stabilisant} min={0} max={150} step={1} unit="mg/l" idealMin={20} idealMax={75} paramKey="stabilisant" />
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <label className="flex items-center gap-2 cursor-pointer mb-3">
@@ -231,7 +231,7 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
             <span className="text-xs text-gray-500">J'ai un électrolyseur au sel</span>
           </label>
           {showSel ? (
-            <Slider label="Sel" value={params.sel} min={0} max={8} step={0.5} unit="g/l" idealMin={3.0} idealMax={5.0} paramKey="sel" />
+            <Slider label="Sel" value={params.sel} min={0} max={8} step={0.1} unit="g/l" idealMin={3.0} idealMax={5.0} paramKey="sel" />
           ) : (
             <div className="text-center text-xs text-gray-300 py-4">Cochez si vous avez un électrolyseur</div>
           )}
