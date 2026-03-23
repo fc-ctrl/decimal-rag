@@ -364,21 +364,58 @@ export default function CatalogPage() {
               {/* Photos */}
               <div className="p-5 border-b border-border">
                 <div className="text-xs font-medium text-text-muted mb-3">Photos ({item.photos?.length || 0})</div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-3">
                   {(item.photos || []).map((p, i) => (
-                    <div key={i} className="relative group/photo">
-                      <img src={p.url} alt={p.view} className="w-full h-28 object-cover rounded-lg border" />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-lg px-2 py-1">
-                        <span className="text-[9px] text-white uppercase">{p.view}</span>
+                    <div key={i} className="flex gap-3 items-start bg-gray-50 rounded-lg p-3 group/photo">
+                      <div className="relative shrink-0">
+                        <img src={p.url} alt={p.view} className="w-28 h-28 object-cover rounded-lg border" />
+                        <button onClick={() => deletePhoto(item.id, i)} className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover/photo:opacity-100 hover:bg-red-600">
+                          <X size={10} />
+                        </button>
                       </div>
-                      <button onClick={() => deletePhoto(item.id, i)} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover/photo:opacity-100 hover:bg-red-600">
-                        <X size={10} />
-                      </button>
+                      <div className="flex-1 space-y-2">
+                        <select value={p.view} onChange={e => {
+                          const newPhotos = [...(item.photos || [])]
+                          newPhotos[i] = { ...newPhotos[i], view: e.target.value }
+                          supabase.from('rag_equipment_catalog').update({ photos: newPhotos }).eq('id', item.id)
+                          setItems(items.map(x => x.id === item.id ? { ...x, photos: newPhotos } : x))
+                        }} className="px-2 py-1 border border-border rounded text-xs">
+                          <option value="face">Face</option>
+                          <option value="cote">Côté</option>
+                          <option value="dessus">Dessus</option>
+                          <option value="plaque">Plaque signalétique</option>
+                          <option value="ecran">Écran / Coffret</option>
+                          <option value="autre">Autre</option>
+                        </select>
+                        <textarea value={p.description} onChange={e => {
+                          const newPhotos = [...(item.photos || [])]
+                          newPhotos[i] = { ...newPhotos[i], description: e.target.value }
+                          setItems(items.map(x => x.id === item.id ? { ...x, photos: newPhotos } : x))
+                        }} onBlur={() => {
+                          supabase.from('rag_equipment_catalog').update({ photos: item.photos }).eq('id', item.id)
+                        }} className="w-full px-2 py-1.5 border border-border rounded text-xs resize-none" rows={2} placeholder="Description de cette vue..." />
+                        <button onClick={async () => {
+                          const base64 = p.url.split(',')[1]
+                          if (!base64) return
+                          const btn = document.activeElement as HTMLButtonElement
+                          btn.textContent = 'Analyse...'
+                          btn.disabled = true
+                          const result = await analyzePhoto(base64)
+                          const newPhotos = [...(item.photos || [])]
+                          newPhotos[i] = { ...newPhotos[i], description: result.description || p.description }
+                          await supabase.from('rag_equipment_catalog').update({ photos: newPhotos }).eq('id', item.id)
+                          setItems(items.map(x => x.id === item.id ? { ...x, photos: newPhotos } : x))
+                          btn.textContent = 'Analyser avec IA'
+                          btn.disabled = false
+                        }} className="text-[10px] px-2 py-1 border border-border rounded hover:bg-primary/10 hover:text-primary hover:border-primary">
+                          Analyser avec IA
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  <label className="w-full h-28 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-text-muted hover:border-primary hover:text-primary cursor-pointer">
-                    <Camera size={20} />
-                    <span className="text-[10px] mt-1">Ajouter</span>
+                  <label className="w-full py-4 border-2 border-dashed border-border rounded-lg flex items-center justify-center gap-2 text-text-muted hover:border-primary hover:text-primary cursor-pointer">
+                    <Camera size={16} />
+                    <span className="text-xs">Ajouter une photo</span>
                     <input ref={el => { editPhotoRef.current = el }} type="file" accept="image/*" className="hidden" onChange={e => {
                       const file = e.target.files?.[0]
                       if (file) { addPhotoToExisting(item.id, file); if (editPhotoRef.current) editPhotoRef.current.value = '' }
