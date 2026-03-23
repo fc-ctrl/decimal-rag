@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Plus, Trash2, Camera, Loader, Search, Package, Pencil, X } from 'lucide-react'
+import { Plus, Camera, Loader, Search, Package, X } from 'lucide-react'
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
 
@@ -319,27 +319,11 @@ export default function CatalogPage() {
       {/* Catalog grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map(item => (
-          <div key={item.id} className="bg-white rounded-xl border border-border overflow-hidden group">
-            {/* Photos */}
+          <div key={item.id} className="bg-white rounded-xl border border-border overflow-hidden group cursor-pointer hover:shadow-md transition-shadow" onClick={() => startEdit(item)}>
             {(item.photos?.length > 0 || item.photo_url) ? (
               <div className="relative">
-                <div className="flex overflow-x-auto gap-0.5 snap-x">
-                  {(item.photos?.length > 0 ? item.photos : [{ url: item.photo_url || '', view: 'face', description: '' }]).map((p, i) => (
-                    <div key={i} className="min-w-full snap-center relative">
-                      <img src={p.url} alt={p.view} className="w-full h-44 object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                        <span className="text-[10px] text-white/80 uppercase">{p.view}</span>
-                        {p.description && <div className="text-[10px] text-white/70 truncate">{p.description}</div>}
-                      </div>
-                      {editingId === item.id && item.photos && item.photos.length > 1 && (
-                        <button onClick={() => deletePhoto(item.id, i)} className="absolute top-1 left-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600" title="Supprimer cette photo">
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <span className="absolute top-1 right-1 text-[9px] bg-black/50 text-white px-1.5 py-0.5 rounded">{item.photos?.length || 1} photo{(item.photos?.length || 1) > 1 ? 's' : ''}</span>
+                <img src={(item.photos?.[0] || { url: item.photo_url }).url} alt="" className="w-full h-44 object-cover" />
+                {(item.photos?.length || 0) > 1 && <span className="absolute top-1 right-1 text-[9px] bg-black/50 text-white px-1.5 py-0.5 rounded">{item.photos?.length} photos</span>}
               </div>
             ) : (
               <div className="w-full h-44 bg-gray-100 flex items-center justify-center">
@@ -347,53 +331,9 @@ export default function CatalogPage() {
               </div>
             )}
             <div className="p-3">
-              {editingId === item.id ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <input value={editData.brand} onChange={e => setEditData({ ...editData, brand: e.target.value })} className="px-2 py-1 border border-border rounded text-xs" placeholder="Marque" />
-                    <input value={editData.model} onChange={e => setEditData({ ...editData, model: e.target.value })} className="px-2 py-1 border border-border rounded text-xs" placeholder="Modèle" />
-                  </div>
-                  <select value={editData.type} onChange={e => setEditData({ ...editData, type: e.target.value })} className="w-full px-2 py-1 border border-border rounded text-xs">
-                    <option>Pompe de filtration</option>
-                    <option>Pompe à chaleur</option>
-                    <option>Électrolyseur</option>
-                    <option>Régulateur</option>
-                    <option>Filtre</option>
-                    <option>Volet</option>
-                    <option>Robot</option>
-                    <option>Coffret de commande</option>
-                    <option>Autre</option>
-                  </select>
-                  <textarea value={editData.visual_traits} onChange={e => setEditData({ ...editData, visual_traits: e.target.value })} className="w-full px-2 py-1 border border-border rounded text-xs resize-none" rows={3} placeholder="Traits visuels distinctifs..." />
-                  <div className="flex gap-1">
-                    <button onClick={saveEdit} className="px-3 py-1 bg-primary text-white rounded text-xs hover:bg-primary-hover">Sauver</button>
-                    <button onClick={() => setEditingId(null)} className="px-3 py-1 border border-border rounded text-xs hover:bg-gray-50">Annuler</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium">{item.brand} {item.model}</div>
-                    <div className="text-xs text-text-muted">{item.type}</div>
-                    {item.visual_traits && <div className="text-xs text-text-muted mt-1 italic">{item.visual_traits}</div>}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => startEdit(item)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-primary" title="Modifier">
-                      <Pencil size={14} />
-                    </button>
-                    <label className="opacity-0 group-hover:opacity-100 cursor-pointer text-text-muted hover:text-primary" title="Ajouter une vue">
-                      <Camera size={14} />
-                      <input type="file" accept="image/*" className="hidden" onChange={e => {
-                        const file = e.target.files?.[0]
-                        if (file) addPhotoToExisting(item.id, file)
-                      }} />
-                    </label>
-                    <button onClick={() => deleteItem(item.id)} className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-danger">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="text-sm font-medium">{item.brand} {item.model}</div>
+              <div className="text-xs text-text-muted">{item.type}</div>
+              {item.visual_traits && <div className="text-xs text-text-muted mt-1 italic line-clamp-2">{item.visual_traits}</div>}
             </div>
           </div>
         ))}
@@ -404,6 +344,88 @@ export default function CatalogPage() {
           Aucun modèle dans le catalogue. Ajoutez-en un avec le bouton "Ajouter (photo)".
         </div>
       )}
+
+      {/* Edit modal */}
+      {editingId && (() => {
+        const item = items.find(i => i.id === editingId)
+        if (!item) return null
+        const editPhotoRef = { current: null as HTMLInputElement | null }
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) setEditingId(null) }}>
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-5 border-b border-border flex items-center justify-between">
+                <h2 className="text-base font-semibold">{item.brand} {item.model}</h2>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { deleteItem(item.id); setEditingId(null) }} className="text-xs text-danger hover:underline">Supprimer</button>
+                  <button onClick={() => setEditingId(null)} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100"><X size={16} /></button>
+                </div>
+              </div>
+
+              {/* Photos */}
+              <div className="p-5 border-b border-border">
+                <div className="text-xs font-medium text-text-muted mb-3">Photos ({item.photos?.length || 0})</div>
+                <div className="grid grid-cols-3 gap-3">
+                  {(item.photos || []).map((p, i) => (
+                    <div key={i} className="relative group/photo">
+                      <img src={p.url} alt={p.view} className="w-full h-28 object-cover rounded-lg border" />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-lg px-2 py-1">
+                        <span className="text-[9px] text-white uppercase">{p.view}</span>
+                      </div>
+                      <button onClick={() => deletePhoto(item.id, i)} className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover/photo:opacity-100 hover:bg-red-600">
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                  <label className="w-full h-28 border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center text-text-muted hover:border-primary hover:text-primary cursor-pointer">
+                    <Camera size={20} />
+                    <span className="text-[10px] mt-1">Ajouter</span>
+                    <input ref={el => { editPhotoRef.current = el }} type="file" accept="image/*" className="hidden" onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (file) { addPhotoToExisting(item.id, file); if (editPhotoRef.current) editPhotoRef.current.value = '' }
+                    }} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Fields */}
+              <div className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">Marque</label>
+                    <input value={editData.brand} onChange={e => setEditData({ ...editData, brand: e.target.value })} className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-text-muted mb-1">Modèle</label>
+                    <input value={editData.model} onChange={e => setEditData({ ...editData, model: e.target.value })} className="w-full px-3 py-2 border border-border rounded-lg text-sm" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Type</label>
+                  <select value={editData.type} onChange={e => setEditData({ ...editData, type: e.target.value })} className="w-full px-3 py-2 border border-border rounded-lg text-sm">
+                    <option>Pompe de filtration</option>
+                    <option>Pompe à chaleur</option>
+                    <option>Électrolyseur</option>
+                    <option>Régulateur</option>
+                    <option>Filtre</option>
+                    <option>Volet</option>
+                    <option>Robot</option>
+                    <option>Coffret de commande</option>
+                    <option>Autre</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Traits visuels distinctifs</label>
+                  <textarea value={editData.visual_traits} onChange={e => setEditData({ ...editData, visual_traits: e.target.value })} className="w-full px-3 py-2 border border-border rounded-lg text-sm resize-none" rows={3} placeholder="Couleur, forme, détails qui permettent de distinguer ce modèle..." />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={saveEdit} className="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover">Sauvegarder</button>
+                  <button onClick={() => setEditingId(null)} className="px-4 py-2 border border-border rounded-lg text-sm hover:bg-gray-50">Fermer</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
