@@ -52,6 +52,18 @@ export interface ChatSource {
   similarity: number
 }
 
+export interface EquipmentLink {
+  label: string
+  url: string
+  type: string // 'guide' | 'notice' | 'vigipool' | 'guide_etalonnage' | 'guide_installation' | 'problem'
+}
+
+export interface EquipmentTopic {
+  label: string
+  description: string
+  guide_url: string | null
+}
+
 export interface Collection {
   id: string
   org_id: string

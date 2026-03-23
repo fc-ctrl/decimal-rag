@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Plus, Camera, Loader, Search, Package, X } from 'lucide-react'
+import { Plus, Camera, Loader, Search, Package, X, Link, MessageCircle } from 'lucide-react'
+import type { EquipmentLink, EquipmentTopic } from '@/types'
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
 
@@ -18,6 +19,9 @@ interface CatalogItem {
   visual_traits: string | null
   photo_url: string | null
   photos: PhotoItem[]
+  notice_url: string | null
+  links: EquipmentLink[]
+  topics: EquipmentTopic[]
   created_at: string
 }
 
@@ -61,7 +65,7 @@ export default function CatalogPage() {
   const [photoQueue, setPhotoQueue] = useState<PhotoItem[]>([])
   const [newItem, setNewItem] = useState({ brand: '', model: '', type: '', visual_traits: '' })
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editData, setEditData] = useState({ brand: '', model: '', type: '', visual_traits: '' })
+  const [editData, setEditData] = useState({ brand: '', model: '', type: '', visual_traits: '', notice_url: '', links: [] as EquipmentLink[], topics: [] as EquipmentTopic[] })
   const firstPhotoRef = useRef<HTMLInputElement>(null)
   const addPhotoRef = useRef<HTMLInputElement>(null)
 
@@ -163,7 +167,12 @@ export default function CatalogPage() {
 
   function startEdit(item: CatalogItem) {
     setEditingId(item.id)
-    setEditData({ brand: item.brand, model: item.model, type: item.type, visual_traits: item.visual_traits || '' })
+    setEditData({
+      brand: item.brand, model: item.model, type: item.type, visual_traits: item.visual_traits || '',
+      notice_url: item.notice_url || '',
+      links: item.links || [],
+      topics: item.topics || [],
+    })
   }
 
   async function saveEdit() {
@@ -334,6 +343,11 @@ export default function CatalogPage() {
               <div className="text-sm font-medium">{item.brand} {item.model}</div>
               <div className="text-xs text-text-muted">{item.type}</div>
               {item.visual_traits && <div className="text-xs text-text-muted mt-1 italic line-clamp-2">{item.visual_traits}</div>}
+              <div className="flex gap-1 mt-1.5 flex-wrap">
+                {item.notice_url && <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded">Notice PDF</span>}
+                {item.links?.length > 0 && <span className="text-[9px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">{item.links.length} lien{item.links.length > 1 ? 's' : ''}</span>}
+                {item.topics?.length > 0 && <span className="text-[9px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">{item.topics.length} sujet{item.topics.length > 1 ? 's' : ''}</span>}
+              </div>
             </div>
           </div>
         ))}
@@ -454,7 +468,63 @@ export default function CatalogPage() {
                   <label className="block text-xs text-text-muted mb-1">Traits visuels distinctifs</label>
                   <textarea value={editData.visual_traits} onChange={e => setEditData({ ...editData, visual_traits: e.target.value })} className="w-full px-3 py-2 border border-border rounded-lg text-sm resize-none" rows={3} placeholder="Couleur, forme, détails qui permettent de distinguer ce modèle..." />
                 </div>
-                <div className="flex gap-2 pt-2">
+
+                {/* Notice URL */}
+                <div className="pt-3 border-t border-border">
+                  <label className="block text-xs text-text-muted mb-1">Notice PDF (URL)</label>
+                  <input value={editData.notice_url} onChange={e => setEditData({ ...editData, notice_url: e.target.value })} className="w-full px-3 py-2 border border-border rounded-lg text-sm" placeholder="https://cosy-piscine.fr/.../notice.pdf" />
+                </div>
+
+                {/* Links */}
+                <div className="pt-3 border-t border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs text-text-muted flex items-center gap-1"><Link size={12} /> Liens / Guides ({editData.links.length})</label>
+                    <button onClick={() => setEditData({ ...editData, links: [...editData.links, { label: '', url: '', type: 'guide' }] })} className="text-[10px] px-2 py-0.5 border border-border rounded hover:bg-gray-50">+ Ajouter</button>
+                  </div>
+                  <div className="space-y-2">
+                    {editData.links.map((link, li) => (
+                      <div key={li} className="flex gap-2 items-start bg-gray-50 rounded-lg p-2">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex gap-2">
+                            <input value={link.label} onChange={e => { const l = [...editData.links]; l[li] = { ...l[li], label: e.target.value }; setEditData({ ...editData, links: l }) }} className="flex-1 px-2 py-1 border border-border rounded text-xs" placeholder="Titre du lien" />
+                            <select value={link.type} onChange={e => { const l = [...editData.links]; l[li] = { ...l[li], type: e.target.value }; setEditData({ ...editData, links: l }) }} className="px-2 py-1 border border-border rounded text-xs">
+                              <option value="guide">Guide</option>
+                              <option value="guide_etalonnage">Étalonnage</option>
+                              <option value="guide_installation">Installation</option>
+                              <option value="notice">Notice</option>
+                              <option value="vigipool">Vigipool</option>
+                              <option value="problem">Problème</option>
+                            </select>
+                          </div>
+                          <input value={link.url} onChange={e => { const l = [...editData.links]; l[li] = { ...l[li], url: e.target.value }; setEditData({ ...editData, links: l }) }} className="w-full px-2 py-1 border border-border rounded text-xs" placeholder="https://service.cosy-piscine.com/..." />
+                        </div>
+                        <button onClick={() => setEditData({ ...editData, links: editData.links.filter((_, j) => j !== li) })} className="text-text-muted hover:text-danger mt-1"><X size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Topics */}
+                <div className="pt-3 border-t border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs text-text-muted flex items-center gap-1"><MessageCircle size={12} /> Sujets fréquents ({editData.topics.length})</label>
+                    <button onClick={() => setEditData({ ...editData, topics: [...editData.topics, { label: '', description: '', guide_url: null }] })} className="text-[10px] px-2 py-0.5 border border-border rounded hover:bg-gray-50">+ Ajouter</button>
+                  </div>
+                  <div className="space-y-2">
+                    {editData.topics.map((topic, ti) => (
+                      <div key={ti} className="flex gap-2 items-start bg-gray-50 rounded-lg p-2">
+                        <div className="flex-1 space-y-1">
+                          <input value={topic.label} onChange={e => { const t = [...editData.topics]; t[ti] = { ...t[ti], label: e.target.value }; setEditData({ ...editData, topics: t }) }} className="w-full px-2 py-1 border border-border rounded text-xs" placeholder="Sujet (ex: Étalonnage sondes)" />
+                          <input value={topic.description} onChange={e => { const t = [...editData.topics]; t[ti] = { ...t[ti], description: e.target.value }; setEditData({ ...editData, topics: t }) }} className="w-full px-2 py-1 border border-border rounded text-xs" placeholder="Description courte" />
+                          <input value={topic.guide_url || ''} onChange={e => { const t = [...editData.topics]; t[ti] = { ...t[ti], guide_url: e.target.value || null }; setEditData({ ...editData, topics: t }) }} className="w-full px-2 py-1 border border-border rounded text-xs" placeholder="URL guide (optionnel)" />
+                        </div>
+                        <button onClick={() => setEditData({ ...editData, topics: editData.topics.filter((_, j) => j !== ti) })} className="text-text-muted hover:text-danger mt-1"><X size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-3 border-t border-border">
                   <button onClick={saveEdit} className="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary-hover">Sauvegarder</button>
                   <button onClick={() => setEditingId(null)} className="px-4 py-2 border border-border rounded-lg text-sm hover:bg-gray-50">Fermer</button>
                 </div>
