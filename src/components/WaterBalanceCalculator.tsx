@@ -97,7 +97,13 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
   // Get relevant tips
   const getRelevantTips = useCallback(() => {
     return allTips.filter(t => {
+      // If tip is for a specific situation, only show if it matches
       if (t.linked_situation && t.linked_situation !== situation) return false
+      // If we're on a specific situation (not analyse_courante), only show tips that are:
+      // - linked to this situation, OR
+      // - linked to a parameter that is out of range
+      if (situation !== 'analyse_courante' && !t.linked_situation && !t.linked_param) return false
+      // If linked to a param, only show if that param is out of range
       if (t.linked_param) {
         if (t.linked_param === 'tac' && params.tac >= 80 && params.tac <= 200) return false
         if (t.linked_param === 'ph' && params.ph >= 7.0 && params.ph <= 7.4) return false

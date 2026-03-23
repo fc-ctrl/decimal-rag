@@ -82,7 +82,10 @@ export default function ExportReport({ params, lsi, lsiLabel, showSel, situation
   const [sitData, setSitData] = useState<SituationData | null>(null)
 
   useEffect(() => {
-    supabase.from('rag_tips').select('title, content').eq('active', true).or(`linked_situation.is.null,linked_situation.eq.${situation}`).order('sort_order').then(r => setTips(r.data || []))
+    const query = situation === 'analyse_courante'
+      ? supabase.from('rag_tips').select('title, content').eq('active', true).order('sort_order')
+      : supabase.from('rag_tips').select('title, content').eq('active', true).eq('linked_situation', situation).order('sort_order')
+    query.then(r => setTips(r.data || []))
     if (situation !== 'analyse_courante') {
       supabase.from('rag_water_situations').select('slug, label, guide_url').eq('slug', situation).single().then(r => setSitData(r.data))
     }
