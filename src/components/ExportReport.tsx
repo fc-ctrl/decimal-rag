@@ -22,15 +22,58 @@ interface Props {
   onClose: () => void
 }
 
+// Ordered: TAC first (pH depends on it), then pH, TH, Chlore, Stabilisant, Sel
 const PARAMS_CONFIG = [
-  { key: 'ph', label: 'pH', min: 6, max: 8.5, idealMin: 7.0, idealMax: 7.4, unit: '' },
   { key: 'tac', label: 'TAC (alcalinité)', min: 0, max: 300, idealMin: 80, idealMax: 200, unit: 'mg/l' },
+  { key: 'ph', label: 'pH', min: 6, max: 8.5, idealMin: 7.0, idealMax: 7.4, unit: '' },
   { key: 'th', label: 'TH (dureté)', min: 0, max: 500, idealMin: 150, idealMax: 300, unit: 'mg/l' },
   { key: 'chlore', label: 'Chlore', min: 0, max: 5, idealMin: 1.0, idealMax: 1.5, unit: 'mg/l' },
   { key: 'stabilisant', label: 'Stabilisant', min: 0, max: 150, idealMin: 20, idealMax: 75, unit: 'mg/l' },
   { key: 'sel', label: 'Sel', min: 0, max: 10, idealMin: 3.0, idealMax: 5.0, unit: 'g/l' },
-  { key: 'temperature', label: 'Température', min: 5, max: 35, idealMin: 20, idealMax: 30, unit: '°C' },
 ] as const
+
+function fmt(grams: number): string {
+  return grams < 1000 ? `${Math.round(grams)} g` : `${(grams / 1000).toFixed(2)} kg`
+}
+function fmtDose(grams: number): string {
+  const d = grams / 3
+  return d < 1000 ? `${Math.round(d)} g` : `${(d / 1000).toFixed(3)} kg`
+}
+
+function getAdvice(key: string, p: WaterParams): { status: string; text: string; color: string } {
+  switch (key) {
+    case 'tac':
+      if (p.tac < 80) { const a = (100 - p.tac) * 1.5 * p.volume; return { status: 'À corriger', color: '#ef4444', text: `TAC trop bas. Ajouter ${fmt(a)} de TAC+ ou Alcaplus en 3 doses de ${fmtDose(a)} toutes les 4h.` } }
+      if (p.tac > 200) return { status: 'Attention', color: '#f59e0b', text: 'TAC trop élevé. Ajustez le pH ou diluez.' }
+      return { status: 'OK', color: '#22c55e', text: 'TAC dans la plage optimale.' }
+    case 'ph':
+      if (p.ph < 7.0) {
+        const a = (7.0 - p.ph) * 150 * p.volume
+        if (p.tac < 80) return { status: 'À corriger', color: '#ef4444', text: `pH trop bas. Corrigez d'abord le TAC. Sinon: ${fmt(a)} de pH+ en 3 doses de ${fmtDose(a)} toutes les 4h.` }
+        return { status: 'À corriger', color: '#ef4444', text: `pH trop bas. Ajouter ${fmt(a)} de pH+ en 3 doses de ${fmtDose(a)} toutes les 4h.` }
+      }
+      if (p.ph > 7.4) { const a = (p.ph - 7.2) * 150 * p.volume; return { status: 'Attention', color: '#f59e0b', text: `pH trop haut. Ajouter ${fmt(a)} de pH- en poudre en 3 doses de ${fmtDose(a)} toutes les 4h.` } }
+      return { status: 'OK', color: '#22c55e', text: 'pH dans la plage optimale.' }
+    case 'th':
+      if (p.th < 150) return { status: 'Attention', color: '#f59e0b', text: `Eau douce, agressive. Ajouter ${fmt((200 - p.th) * p.volume)} de chlorure de calcium.` }
+      if (p.th > 300) return { status: 'Attention', color: '#f59e0b', text: 'Eau dure, risque de tartre.' }
+      return { status: 'OK', color: '#22c55e', text: 'TH dans la plage optimale.' }
+    case 'chlore':
+      if (p.chlore < 1.0) return { status: 'À corriger', color: '#ef4444', text: `Chlore insuffisant. Ajouter ${fmt((1.0 - p.chlore) * 1.5 * p.volume)} de chlore granulé ou augmenter l'électrolyseur.` }
+      if (p.chlore > 3.0) return { status: 'URGENT', color: '#ef4444', text: `Surchloration forte (${(p.chlore - 1.0).toFixed(1)} mg/l). Passer en magasin pour séquestrant.` }
+      if (p.chlore > 1.5) return { status: 'Attention', color: '#f59e0b', text: `Surchloration modérée. Réduire la production.` }
+      return { status: 'OK', color: '#22c55e', text: 'Chlore dans la plage optimale.' }
+    case 'stabilisant':
+      if (p.stabilisant < 20) return { status: 'Attention', color: '#f59e0b', text: `Stabilisant bas. Ajouter ${fmt((30 - p.stabilisant) * p.volume)} d'acide cyanurique.` }
+      if (p.stabilisant > 75) return { status: 'URGENT', color: '#ef4444', text: 'Sur-stabilisation. Vidange partielle (30%) nécessaire.' }
+      return { status: 'OK', color: '#22c55e', text: 'Stabilisant dans la plage optimale.' }
+    case 'sel':
+      if (p.sel < p.selElectrolyseur) return { status: 'Attention', color: '#f59e0b', text: `Sel insuffisant. Ajouter ${fmt((p.selElectrolyseur - p.sel) * p.volume * 1000)} de sel piscine.` }
+      if (p.sel > p.selElectrolyseur + 2) return { status: 'Attention', color: '#f59e0b', text: 'Sel trop élevé. Diluer avec eau fraîche.' }
+      return { status: 'OK', color: '#22c55e', text: 'Sel dans la plage optimale.' }
+    default: return { status: 'OK', color: '#22c55e', text: '' }
+  }
+}
 
 function lsiColor(lsi: number): string {
   if (lsi < -0.3 || lsi > 0.3) return '#ef4444'
@@ -61,7 +104,7 @@ export default function ExportReport({ params, lsi, lsiLabel, showSel, onClose }
         const isOk = value >= p.idealMin && value <= p.idealMax
         const isWarn = !isOk && value >= p.idealMin * 0.7 && value <= p.idealMax * 1.3
         const color = isOk ? '#22c55e' : isWarn ? '#f59e0b' : '#ef4444'
-        const status = isOk ? '✓ OK' : isWarn ? '⚠ Attention' : '✗ À corriger'
+        void isWarn // used in color
 
         const r = 55, cx = 70, cy = 70
         const idealStartPct = (p.idealMin - p.min) / (p.max - p.min)
@@ -75,19 +118,26 @@ export default function ExportReport({ params, lsi, lsiLabel, showSel, onClose }
         const nx = cx + (r - 10) * Math.cos(needleAngle)
         const ny = cy + (r - 10) * Math.sin(needleAngle)
 
-        return `<div style="text-align:center;page-break-inside:avoid">
-          <svg width="140" height="105" viewBox="0 0 140 105">
-            <path d="${arc(0, idealStartPct)}" fill="none" stroke="#fecaca" stroke-width="8" stroke-linecap="round"/>
-            <path d="${arc(idealStartPct, idealEndPct)}" fill="none" stroke="#bbf7d0" stroke-width="8" stroke-linecap="round"/>
-            <path d="${arc(idealEndPct, 1)}" fill="none" stroke="#fecaca" stroke-width="8" stroke-linecap="round"/>
-            <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>
-            <circle cx="${cx}" cy="${cy}" r="4" fill="${color}"/>
-            <text x="${cx}" y="${cy + 20}" text-anchor="middle" font-size="14" font-weight="bold" fill="${color}">${value} ${p.unit}</text>
-            <text x="10" y="${cy + 10}" font-size="8" fill="#999">${p.min}</text>
-            <text x="130" y="${cy + 10}" text-anchor="end" font-size="8" fill="#999">${p.max}</text>
-          </svg>
-          <div style="font-size:12px;font-weight:600;color:#374151">${p.label}</div>
-          <div style="font-size:10px;color:${color};margin-top:2px">${status} (idéal: ${p.idealMin}-${p.idealMax})</div>
+        const advice = getAdvice(p.key, params)
+
+        return `<div style="page-break-inside:avoid;border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fafafa">
+          <div style="text-align:center">
+            <svg width="140" height="105" viewBox="0 0 140 105">
+              <path d="${arc(0, idealStartPct)}" fill="none" stroke="#fecaca" stroke-width="8" stroke-linecap="round"/>
+              <path d="${arc(idealStartPct, idealEndPct)}" fill="none" stroke="#bbf7d0" stroke-width="8" stroke-linecap="round"/>
+              <path d="${arc(idealEndPct, 1)}" fill="none" stroke="#fecaca" stroke-width="8" stroke-linecap="round"/>
+              <line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>
+              <circle cx="${cx}" cy="${cy}" r="4" fill="${color}"/>
+              <text x="${cx}" y="${cy + 20}" text-anchor="middle" font-size="14" font-weight="bold" fill="${color}">${value} ${p.unit}</text>
+              <text x="10" y="${cy + 10}" font-size="8" fill="#999">${p.min}</text>
+              <text x="130" y="${cy + 10}" text-anchor="end" font-size="8" fill="#999">${p.max}</text>
+            </svg>
+            <div style="font-size:12px;font-weight:600;color:#374151">${p.label}</div>
+          </div>
+          <div style="margin-top:8px;padding:8px;border-radius:8px;background:${advice.color === '#22c55e' ? '#f0fdf4' : advice.color === '#f59e0b' ? '#fffbeb' : '#fef2f2'};border:1px solid ${advice.color}20">
+            <div style="font-size:10px;font-weight:700;color:${advice.color};margin-bottom:3px">${advice.status === 'OK' ? '✓' : '⚠'} ${advice.status} — idéal: ${p.idealMin}-${p.idealMax} ${p.unit}</div>
+            <div style="font-size:10px;color:#374151">${advice.text}</div>
+          </div>
         </div>`
       }).join('')
 
