@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
-import { Droplets, Thermometer, AlertTriangle, CheckCircle, Download, MessageSquare } from 'lucide-react'
+import { Droplets, Thermometer, AlertTriangle, CheckCircle, FileText, MessageSquare } from 'lucide-react'
+import ExportReport from './ExportReport'
 
 interface WaterParams {
   temperature: number
@@ -55,6 +56,7 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
   const [showDimensions, setShowDimensions] = useState(false)
   const [dims, setDims] = useState({ l: 8, w: 4, d: 1.5 })
   const [history, setHistory] = useState<{ date: string; params: WaterParams; lsi: number }[]>([])
+  const [showExport, setShowExport] = useState(false)
 
   const lsi = calculateLSI(params)
   const lsiLabel = lsi < -0.3 ? 'Eau corrosive — risque de dégradation des équipements' : lsi > 0.3 ? 'Eau entartrante — risque de dépôts calcaires' : 'Eau équilibrée'
@@ -78,25 +80,6 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
     setHistory(h => [{ date: new Date().toISOString(), params: { ...params }, lsi }, ...h].slice(0, 20))
   }, [params, lsi])
 
-  const exportAnalysis = useCallback(() => {
-    const text = [
-      '═══════════════════════════════════════════',
-      '  ANALYSE ÉQUILIBRE EAU — COSY PISCINE',
-      `  ${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR')}`,
-      `  Volume : ${params.volume} m³`,
-      '═══════════════════════════════════════════',
-      '', `  Température : ${params.temperature}°C`, `  pH : ${params.ph}`, `  TAC : ${params.tac} mg/l`,
-      `  TH : ${params.th} mg/l`, `  Chlore : ${params.chlore} mg/l`, `  Stabilisant : ${params.stabilisant} mg/l`,
-      showSel ? `  Sel : ${params.sel} g/l (requis: ${params.selElectrolyseur} g/l)` : '',
-      '', `  INDICE DE LANGELIER : ${lsi > 0 ? '+' : ''}${lsi}`, `  ${lsiLabel}`,
-      '', '  © Cosy Piscine — service.cosy-piscine.com',
-    ].filter(Boolean).join('\n')
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `analyse-eau-${new Date().toISOString().slice(0, 10)}.txt`
-    a.click()
-  }, [params, lsi, lsiLabel, showSel])
 
   const chatMsg = `Analyse eau : pH=${params.ph}, TAC=${params.tac}, TH=${params.th}, chlore=${params.chlore}, stabilisant=${params.stabilisant}${showSel ? `, sel=${params.sel}` : ''}, temp=${params.temperature}°C, vol=${params.volume}m³. LSI=${lsi}. Conseils ?`
 
@@ -376,10 +359,13 @@ export default function WaterBalanceCalculator({ showHistory = false, onOpenChat
 
       {/* Actions */}
       <div className="flex gap-2 flex-wrap mb-4">
-        <button onClick={exportAnalysis} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50"><Download size={16} /> Exporter</button>
+        <button onClick={() => setShowExport(true)} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50"><FileText size={16} /> Rapport PDF</button>
         {showHistory && <button onClick={saveToHistory} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50"><CheckCircle size={16} /> Sauvegarder</button>}
         {onOpenChat && <button onClick={() => onOpenChat(chatMsg)} className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-xl text-sm hover:bg-blue-600"><MessageSquare size={16} /> Demander conseil</button>}
       </div>
+
+      {/* Export modal */}
+      {showExport && <ExportReport params={params} lsi={lsi} lsiLabel={lsiLabel} showSel={showSel} onClose={() => setShowExport(false)} />}
 
       {/* History */}
       {showHistory && history.length > 0 && (
