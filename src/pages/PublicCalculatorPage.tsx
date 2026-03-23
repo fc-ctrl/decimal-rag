@@ -1,5 +1,6 @@
 import WaterBalanceCalculator from '@/components/WaterBalanceCalculator'
 import { Droplets } from 'lucide-react'
+import packageJson from '../../package.json'
 
 export default function PublicCalculatorPage() {
   return (
@@ -14,6 +15,7 @@ export default function PublicCalculatorPage() {
             <div>
               <span className="text-sm font-semibold">Cosy Piscine</span>
               <span className="text-xs text-gray-400 ml-2">Outils</span>
+              <span className="text-[9px] text-gray-300 ml-1">v{packageJson.version}</span>
             </div>
           </div>
           <a href="https://service.cosy-piscine.com" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">

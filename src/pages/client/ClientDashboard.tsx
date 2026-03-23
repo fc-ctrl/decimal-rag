@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MessageSquare, Wrench, Camera, LogOut, AlertCircle, CheckCircle, Clock, Droplets } from 'lucide-react'
+import packageJson from '../../../package.json'
 
 const AIRTABLE_PROXY = 'https://n8n.decimal-ia.com/webhook/cosy-client-data'
 
@@ -58,7 +59,7 @@ export default function ClientDashboard({ clientName, contactId, onNavigate, onL
             <span className="text-lg font-bold">C</span>
           </div>
           <div>
-            <div className="text-sm font-medium">Cosy Piscine</div>
+            <div className="text-sm font-medium">Cosy Piscine <span className="text-[9px] text-sky-300 font-normal">v{packageJson.version}</span></div>
             <div className="text-xs text-sky-200">Bonjour {clientName}</div>
           </div>
         </div>
