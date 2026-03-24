@@ -30,6 +30,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [catalogCtx, setCatalogCtx] = useState('')
   const [pendingImage, setPendingImage] = useState<string | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const photoRef = useRef<HTMLInputElement>(null)
@@ -42,7 +43,17 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
 
   useEffect(() => {
     loadEquipment()
+    loadCatalog()
   }, [contactId])
+
+  async function loadCatalog() {
+    const { data } = await supabase.from('rag_equipment_catalog').select('brand, model, type, visual_traits')
+    if (data) {
+      setCatalogCtx('\n\nEQUIPEMENTS CONNUS (compare la photo avec cette liste) :\n' + data.map((c: Record<string, unknown>) =>
+        `- ${c.brand} ${c.model} (${c.type})${c.visual_traits ? ' : ' + c.visual_traits : ''}`
+      ).join('\n'))
+    }
+  }
 
   async function loadEquipment() {
     try {
@@ -121,7 +132,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatInput: input + (imageData ? '' : equipCtx),
+          chatInput: input + (imageData ? catalogCtx : equipCtx),
           sessionId: sessionId.current,
           ...(imageData ? { image: imageData } : {}),
         }),
