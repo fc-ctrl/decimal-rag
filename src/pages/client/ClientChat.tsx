@@ -20,6 +20,9 @@ interface Equipment {
   brand: string
   model: string
   type: string
+  notice_url?: string
+  links?: { label: string; url: string }[]
+  topics?: { label: string; description: string }[]
 }
 
 export default function ClientChat({ clientName, contactId, onBack }: Props) {
@@ -48,13 +51,27 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
         .select('produit_id, mat_produits!inner(marque, modele, mat_sous_categories!inner(nom))')
         .eq('client_airtable_id', contactId)
       if (data) {
+        // Load RAG catalog for links
+        const { data: catalog } = await supabase.from('rag_equipment_catalog').select('linked_product_ids, notice_url, links, topics')
+
         setEquipment(data.map((d: Record<string, unknown>) => {
           const prod = d.mat_produits as Record<string, unknown>
+          const prodId = d.produit_id as string
           const sc = prod?.mat_sous_categories as Record<string, unknown>
+
+          // Match with RAG catalog via linked_product_ids
+          const ragMatch = catalog?.find((c: Record<string, unknown>) => {
+            const ids = c.linked_product_ids as string[] | null
+            return ids?.includes(prodId)
+          })
+
           return {
             brand: (prod?.marque || '') as string,
             model: (prod?.modele || '') as string,
             type: (sc?.nom || '') as string,
+            notice_url: (ragMatch?.notice_url || undefined) as string | undefined,
+            links: (ragMatch?.links || []) as Equipment['links'],
+            topics: (ragMatch?.topics || []) as Equipment['topics'],
           }
         }))
       }
@@ -88,10 +105,16 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
     setSending(true)
 
     try {
-      // Build context with client equipment
+      // Build context with client equipment + RAG info (notices, guides)
       let equipCtx = ''
       if (equipment.length > 0) {
-        equipCtx = '\n\n[MATERIEL DU CLIENT]\n' + equipment.map(e => `- ${e.brand} ${e.model} (${e.type})`).join('\n')
+        equipCtx = '\n\n[MATERIEL DU CLIENT]\n' + equipment.map(e => {
+          let line = `- ${e.brand} ${e.model} (${e.type})`
+          if (e.notice_url) line += `\n  NOTICE_PDF: ${e.notice_url}`
+          if (e.links?.length) line += '\n  GUIDES: ' + e.links.map(l => `${l.label}: ${l.url}`).join(' | ')
+          if (e.topics?.length) line += '\n  SUJETS: ' + e.topics.map(t => t.label).join(', ')
+          return line
+        }).join('\n')
       }
 
       const res = await fetch(CHAT_URL, {
