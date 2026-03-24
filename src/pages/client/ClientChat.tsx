@@ -121,7 +121,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatInput: input + equipCtx,
+          chatInput: input + (imageData ? '' : equipCtx),
           sessionId: sessionId.current,
           ...(imageData ? { image: imageData } : {}),
         }),
