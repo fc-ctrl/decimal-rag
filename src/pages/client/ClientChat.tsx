@@ -133,7 +133,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chatInput: input + (imageData ? catalogCtx : equipCtx),
-          sessionId: sessionId.current,
+          sessionId: 'cosy-' + contactId + '-' + Date.now(),
           ...(imageData ? { image: imageData } : {}),
         }),
       })
