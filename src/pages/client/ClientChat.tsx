@@ -112,7 +112,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
           let line = `- ${e.brand} ${e.model} (${e.type})`
           if (e.notice_url) line += `\n  NOTICE_PDF: ${e.notice_url}`
           if (e.links?.length) line += '\n  GUIDES: ' + e.links.map(l => `${l.label}: ${l.url}`).join(' | ')
-          if (e.topics?.length) line += '\n  SUJETS: ' + e.topics.map(t => t.label).join(', ')
+          if (e.topics?.length) line += '\n  SUJETS: ' + e.topics.map(t => t.guide_url ? `[${t.label}](${t.guide_url})` : t.label).join(' | ')
           return line
         }).join('\n')
       }
