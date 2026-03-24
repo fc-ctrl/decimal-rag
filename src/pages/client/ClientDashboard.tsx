@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MessageSquare, Wrench, Camera, LogOut, AlertCircle, CheckCircle, Clock, Droplets } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import packageJson from '../../../package.json'
 
 const AIRTABLE_PROXY = 'https://n8n.decimal-ia.com/webhook/cosy-client-data'
@@ -37,10 +38,12 @@ export default function ClientDashboard({ clientName, contactId, onNavigate, onL
       })
       const data = await res.json()
       setSavTickets(data.savTickets || [])
-      setEquipmentCount(data.equipmentCount || 0)
-    } catch {
-      // Fallback
-    }
+    } catch {}
+    // Equipment count from back-office table
+    try {
+      const { count } = await supabase.from('mat_parc_client').select('id', { count: 'exact', head: true }).eq('client_airtable_id', contactId)
+      setEquipmentCount(count || 0)
+    } catch {}
     setLoading(false)
   }
 

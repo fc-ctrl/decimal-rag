@@ -44,10 +44,22 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
 
   async function loadEquipment() {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/cosy_equipment?airtable_contact_id=eq.${contactId}&select=brand,model,type`, {
+      // Read from back-office mat_parc_client (not old cosy_equipment)
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/mat_parc_client?client_airtable_id=eq.${contactId}&select=produit_id,mat_produits(marque,modele,mat_sous_categories(nom))`, {
         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
       })
-      setEquipment(await res.json() || [])
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        setEquipment(data.map((d: Record<string, unknown>) => {
+          const prod = d.mat_produits as Record<string, unknown> | null
+          const sc = prod?.mat_sous_categories as Record<string, unknown> | null
+          return {
+            brand: (prod?.marque || '') as string,
+            model: (prod?.modele || '') as string,
+            type: (sc?.nom || '') as string,
+          }
+        }))
+      }
     } catch {}
   }
 
@@ -123,7 +135,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-16 py-4 space-y-3">
         {messages.length === 0 && (
           <div className="text-center py-12 text-gray-400">
             <MessageIcon />
@@ -161,7 +173,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-gray-200 bg-white">
+      <div className="px-4 sm:px-8 lg:px-16 py-3 border-t border-gray-200 bg-white">
         {imagePreview && (
           <div className="mb-2 flex items-center gap-2">
             <img src={imagePreview} alt="Photo" className="w-12 h-12 object-cover rounded-lg border" />
