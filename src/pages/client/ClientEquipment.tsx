@@ -1,8 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Camera, ArrowLeft, Loader, List, Package, Calendar, MapPin, Shield, FileText, ChevronDown } from 'lucide-react'
-
-const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
+import { ArrowLeft, Package, Calendar, MapPin, Shield, FileText, ChevronDown } from 'lucide-react'
 
 interface Props {
   contactId: string
@@ -28,14 +26,6 @@ interface Equipment {
   topics: { label: string; description: string; guide_url: string | null }[]
 }
 
-interface CatalogItem {
-  id: string
-  brand: string
-  model: string
-  type: string
-  visual_traits: string | null
-}
-
 function typeIcon(type: string) {
   const t = type.toLowerCase()
   if (t.includes('pompe')) return '🔄'
@@ -49,14 +39,8 @@ function typeIcon(type: string) {
 
 export default function ClientEquipment({ contactId, onBack }: Props) {
   const [equipment, setEquipment] = useState<Equipment[]>([])
-  const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [addMode, setAddMode] = useState<null | 'photo' | 'list'>(null)
-  const [identifying, setIdentifying] = useState(false)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [identification, setIdentification] = useState<{ brand: string; model: string; type: string } | null>(null)
-  const photoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [contactId])
 
@@ -125,48 +109,7 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
       setEquipment(eqData)
     }
 
-    const { data: catRes } = await supabase.from('rag_equipment_catalog').select('id, brand, model, type, visual_traits').order('type, brand, model')
-    setCatalog(catRes || [])
     setLoading(false)
-  }
-
-  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIdentifying(true)
-    setAddMode('photo')
-    const reader = new FileReader()
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(',')[1]
-      setPreview(reader.result as string)
-      const catalogContext = catalog.map(c => `- ${c.brand} ${c.model} (${c.type})${c.visual_traits ? ' : ' + c.visual_traits : ''}`).join('\n')
-      try {
-        const res = await fetch(CHAT_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chatInput: `Identifie cet equipement en le comparant UNIQUEMENT avec cette liste. Si aucun match, reponds "Non repertorie".\n\nCATALOGUE:\n${catalogContext}\n\nReponds:\nMarque: [marque]\nModele: [modele]\nType: [type]`,
-            sessionId: 'eq-id-' + Date.now(),
-            image: base64,
-          }),
-        })
-        const data = await res.json()
-        const answer = data.output || data.answer || ''
-        const get = (key: string) => answer.match(new RegExp(`${key}\\s*:\\s*(.+?)(?:\\n|$)`, 'i'))?.[1]?.trim() || ''
-        const match = catalog.find(c => c.model.toLowerCase().includes(get('Mod[eè]le').toLowerCase()))
-        setIdentification({ brand: match?.brand || get('Marque'), model: match?.model || get('Mod[eè]le'), type: match?.type || get('Type') })
-      } catch {
-        setIdentification({ brand: 'Non identifié', model: 'Non identifié', type: '' })
-      }
-      setIdentifying(false)
-    }
-    reader.readAsDataURL(file)
-    if (photoRef.current) photoRef.current.value = ''
-  }
-
-  function selectFromCatalog(item: CatalogItem) {
-    setIdentification({ brand: item.brand, model: item.model, type: item.type })
-    setAddMode('photo')
   }
 
   // Group by famille
@@ -189,66 +132,18 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
       </header>
 
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-        {/* Add buttons */}
-        {!addMode && (
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => photoRef.current?.click()} className="flex flex-col items-center gap-2 py-5 border-2 border-dashed border-sky-300 rounded-xl text-sky-600 hover:bg-sky-50">
-              <Camera size={24} /><span className="text-xs font-medium">Prendre une photo</span>
-            </button>
-            <button onClick={() => setAddMode('list')} className="flex flex-col items-center gap-2 py-5 border-2 border-dashed border-sky-300 rounded-xl text-sky-600 hover:bg-sky-50">
-              <List size={24} /><span className="text-xs font-medium">Choisir dans la liste</span>
-            </button>
-          </div>
-        )}
-        <input ref={photoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+        {/* No self-add - contact store */}
 
-        {/* List selector */}
-        {addMode === 'list' && !identification && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">Choisir un équipement</h3>
-              <button onClick={() => setAddMode(null)} className="text-xs text-gray-400">Annuler</button>
-            </div>
-            <div className="space-y-1 max-h-80 overflow-y-auto">
-              {Object.entries(catalog.reduce((acc, c) => { if (!acc[c.type]) acc[c.type] = []; acc[c.type].push(c); return acc }, {} as Record<string, CatalogItem[]>)).map(([type, items]) => (
-                <div key={type}>
-                  <div className="text-[10px] text-gray-400 font-semibold uppercase px-2 pt-2 pb-1">{typeIcon(type)} {type}</div>
-                  {items.map(item => (
-                    <button key={item.id} onClick={() => selectFromCatalog(item)} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-sky-50 rounded-lg text-left">
-                      <div className="text-sm font-medium">{item.brand} {item.model}</div>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Photo / Confirmation */}
-        {addMode === 'photo' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-            {preview && <img src={preview} alt="" className="w-full h-48 object-cover rounded-lg" />}
-            {identifying ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500"><Loader size={16} className="animate-spin" /> Identification en cours...</div>
-            ) : identification ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-gray-50 rounded-lg p-3"><div className="text-[10px] text-gray-400">Type</div><div className="text-sm font-medium">{identification.type}</div></div>
-                  <div className="bg-gray-50 rounded-lg p-3"><div className="text-[10px] text-gray-400">Marque</div><div className="text-sm font-medium">{identification.brand}</div></div>
-                  <div className="bg-gray-50 rounded-lg p-3"><div className="text-[10px] text-gray-400">Modèle</div><div className="text-sm font-medium">{identification.model}</div></div>
-                </div>
-                <p className="text-xs text-gray-400">Pour ajouter cet équipement à votre fiche, contactez votre magasin Cosy Piscine.</p>
-                <button onClick={() => { setAddMode(null); setPreview(null); setIdentification(null) }} className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">Fermer</button>
-              </div>
-            ) : null}
-          </div>
-        )}
 
         {/* Equipment list */}
         {loading ? (
           <div className="text-center py-8"><div className="animate-spin w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full mx-auto" /></div>
-        ) : equipment.length === 0 && !addMode ? (
-          <p className="text-sm text-gray-400 text-center py-8">Aucun équipement enregistré. Contactez votre magasin Cosy Piscine.</p>
+        ) : equipment.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+            <Package size={32} className="mx-auto mb-3 text-gray-300" />
+            <p className="text-sm text-gray-500 font-medium">Aucun équipement enregistré</p>
+            <p className="text-xs text-gray-400 mt-2">Pour ajouter votre matériel, contactez votre magasin Cosy Piscine.</p>
+          </div>
         ) : (
           Object.entries(grouped).map(([famille, items]) => (
             <div key={famille}>
