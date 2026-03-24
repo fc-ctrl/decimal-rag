@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, ArrowLeft, Camera } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 const CHAT_URL = 'https://n8n.decimal-ia.com/webhook/decimal-rag-chat'
-const SUPABASE_URL = 'https://plbjafwltwpupspmlnip.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYmphZndsdHdwdXBzcG1sbmlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NjQ1MTYsImV4cCI6MjA4ODU0MDUxNn0.xQRTqPRBmpEwC1pZ3rX4m9wCtbQHx8jQC-dvgtUbNfk'
 
 interface Props {
   clientName: string
@@ -44,15 +43,14 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
 
   async function loadEquipment() {
     try {
-      // Read from back-office mat_parc_client (not old cosy_equipment)
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/mat_parc_client?client_airtable_id=eq.${contactId}&select=produit_id,mat_produits(marque,modele,mat_sous_categories(nom))`, {
-        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
-      })
-      const data = await res.json()
-      if (Array.isArray(data)) {
+      const { data } = await supabase
+        .from('mat_parc_client')
+        .select('produit_id, mat_produits!inner(marque, modele, mat_sous_categories!inner(nom))')
+        .eq('client_airtable_id', contactId)
+      if (data) {
         setEquipment(data.map((d: Record<string, unknown>) => {
-          const prod = d.mat_produits as Record<string, unknown> | null
-          const sc = prod?.mat_sous_categories as Record<string, unknown> | null
+          const prod = d.mat_produits as Record<string, unknown>
+          const sc = prod?.mat_sous_categories as Record<string, unknown>
           return {
             brand: (prod?.marque || '') as string,
             model: (prod?.modele || '') as string,
