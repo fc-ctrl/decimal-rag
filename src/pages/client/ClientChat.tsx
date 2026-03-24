@@ -159,12 +159,19 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
 
   return (
     <div className="min-h-screen w-full bg-gray-50 flex flex-col">
-      <header className="bg-sky-600 text-white px-6 py-4 flex items-center gap-3">
-        <button onClick={onBack}><ArrowLeft size={20} /></button>
-        <div>
-          <div className="text-sm font-medium">Chat SAV</div>
-          <div className="text-xs text-sky-200">{clientName}</div>
+      <header className="bg-sky-600 text-white px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-sky-200 hover:text-white"><ArrowLeft size={20} /></button>
+          <div>
+            <div className="text-sm font-medium">Chat SAV</div>
+            <div className="text-xs text-sky-200">{clientName}</div>
+          </div>
         </div>
+        {messages.length > 0 && (
+          <button onClick={() => { setMessages([]); sessionId.current = 'cosy-' + contactId + '-' + Date.now() }} className="text-xs text-sky-200 hover:text-white border border-sky-400 px-3 py-1 rounded-lg">
+            Nouvelle conversation
+          </button>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-16 py-4 space-y-3">
