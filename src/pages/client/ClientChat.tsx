@@ -126,7 +126,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen w-full bg-gray-50 flex flex-col">
       <header className="bg-sky-600 text-white px-6 py-4 flex items-center gap-3">
         <button onClick={onBack}><ArrowLeft size={20} /></button>
         <div>

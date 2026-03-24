@@ -178,7 +178,7 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
   }, {} as Record<string, Equipment[]>)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen w-full bg-gray-50">
       <header className="bg-sky-600 text-white px-6 py-4 flex items-center gap-3">
         <button onClick={onBack} className="text-sky-200 hover:text-white"><ArrowLeft size={20} /></button>
         <Package size={20} />

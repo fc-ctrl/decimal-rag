@@ -54,7 +54,7 @@ export default function ClientDashboard({ clientName, contactId, onNavigate, onL
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen w-full bg-gray-50">
       {/* Header */}
       <header className="bg-sky-600 text-white px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
