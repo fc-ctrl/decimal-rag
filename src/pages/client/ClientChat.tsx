@@ -22,7 +22,7 @@ interface Equipment {
   type: string
   notice_url?: string
   links?: { label: string; url: string }[]
-  topics?: { label: string; description: string }[]
+  topics?: { label: string; description: string; guide_url?: string | null }[]
 }
 
 export default function ClientChat({ clientName, contactId, onBack }: Props) {
