@@ -78,10 +78,31 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
         `)
         .eq('client_airtable_id', contactId)
       if (data) {
+        // Load RAG catalog with linked_product_ids for exact matching
+        const { data: catData } = await supabase.from('rag_equipment_catalog').select('linked_product_ids, notice_url, links, topics')
+
         const mapped = data.map((d: Record<string, unknown>) => {
           const prod = d.mat_produits as Record<string, unknown>
+          const prodId = d.produit_id as string
           const sc = prod?.mat_sous_categories as Record<string, unknown>
           const fam = sc?.mat_familles as Record<string, unknown>
+
+          // Match via linked_product_ids (exact link from back-office)
+          let notice_url: string | null = null
+          let links: Equipment['links'] = []
+          let topics: Equipment['topics'] = []
+          if (catData) {
+            const match = catData.find((c: Record<string, unknown>) => {
+              const ids = c.linked_product_ids as string[] | null
+              return ids && ids.includes(prodId)
+            })
+            if (match) {
+              notice_url = match.notice_url as string | null
+              links = (match.links || []) as Equipment['links']
+              topics = (match.topics || []) as Equipment['topics']
+            }
+          }
+
           return {
             id: d.id as string,
             marque: (prod?.marque || '') as string,
@@ -95,25 +116,10 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
             emplacement: d.emplacement as string | null,
             notes: d.notes as string | null,
             photo_url: d.photo_url as string | null,
-            notice_url: null, links: [], topics: [],
+            notice_url, links, topics,
           }
         })
         setEquipment(mapped)
-
-        // Try to match with RAG catalog for extra info
-        const { data: catData } = await supabase.from('rag_equipment_catalog').select('brand, model, notice_url, links, topics')
-        if (catData) {
-          setEquipment(mapped.map(eq => {
-            const match = catData.find((c: Record<string, unknown>) =>
-              (c.model as string).toLowerCase().includes(eq.modele.toLowerCase()) ||
-              eq.modele.toLowerCase().includes((c.model as string).toLowerCase())
-            )
-            if (match) {
-              return { ...eq, notice_url: match.notice_url as string | null, links: (match.links || []) as Equipment['links'], topics: (match.topics || []) as Equipment['topics'] }
-            }
-            return eq
-          }))
-        }
       }
     } else {
       setEquipment(eqData)
