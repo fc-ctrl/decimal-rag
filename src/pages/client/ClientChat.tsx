@@ -135,7 +135,11 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
           if (e.statut) line += `\n  STATUT: ${e.statut}`
           if (e.notice_url) line += `\n  NOTICE_PDF: ${e.notice_url}`
           if (e.links?.length) line += '\n  GUIDES: ' + e.links.map(l => `${l.label}: ${l.url}`).join(' | ')
-          if (e.topics?.length) line += '\n  SUJETS: ' + e.topics.map(t => t.guide_url ? `[${t.label}](${t.guide_url})` : t.label).join(' | ')
+          if (e.topics?.length) line += '\n  SUJETS:\n' + e.topics.map(t => {
+            let s = `  - ${t.label}: ${t.description || ''}`
+            if (t.guide_url) s += ` → ${t.guide_url}`
+            return s
+          }).join('\n')
           return line
         }).join('\n')
       }
