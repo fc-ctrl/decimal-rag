@@ -20,6 +20,7 @@ interface Equipment {
   emplacement: string | null
   notes: string | null
   photo_url: string | null
+  product_image_url: string | null
   // RAG catalog info (if linked)
   notice_url: string | null
   links: { label: string; url: string; type: string }[]
@@ -54,7 +55,7 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
         .from('mat_parc_client')
         .select(`
           id, numero_serie, date_installation, garantie_fin, statut, emplacement, notes, photo_url,
-          mat_produits!inner(marque, modele, sous_categorie_id,
+          mat_produits!inner(marque, modele, image_url, sous_categorie_id,
             mat_sous_categories!inner(nom,
               mat_familles!inner(nom)
             )
@@ -100,6 +101,7 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
             emplacement: d.emplacement as string | null,
             notes: d.notes as string | null,
             photo_url: d.photo_url as string | null,
+            product_image_url: (prod?.image_url || null) as string | null,
             notice_url, links, topics,
           }
         })
@@ -154,7 +156,11 @@ export default function ClientEquipment({ contactId, onBack }: Props) {
                   return (
                     <div key={eq.id} className={`bg-white rounded-xl border transition-all ${isExpanded ? 'border-sky-300 shadow-md' : 'border-gray-200'}`}>
                       <button onClick={() => setExpandedId(isExpanded ? null : eq.id)} className="w-full flex items-center gap-4 p-4 text-left">
-                        <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center text-lg">{typeIcon(eq.sous_categorie)}</div>
+                        {eq.product_image_url ? (
+                          <img src={eq.product_image_url} alt={eq.modele} className="w-12 h-12 rounded-lg object-cover bg-gray-100" />
+                        ) : (
+                          <div className="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center text-lg">{typeIcon(eq.sous_categorie)}</div>
+                        )}
                         <div className="flex-1">
                           <div className="text-sm font-semibold">{eq.marque} — {eq.modele}</div>
                           <div className="text-xs text-gray-400">{eq.famille} › {eq.sous_categorie}</div>
