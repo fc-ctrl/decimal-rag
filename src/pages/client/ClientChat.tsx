@@ -20,6 +20,10 @@ interface Equipment {
   brand: string
   model: string
   type: string
+  numero_serie?: string | null
+  date_installation?: string | null
+  garantie_fin?: string | null
+  statut?: string | null
   notice_url?: string
   links?: { label: string; url: string }[]
   topics?: { label: string; description: string; guide_url?: string | null }[]
@@ -59,7 +63,7 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
     try {
       const { data } = await supabase
         .from('mat_parc_client')
-        .select('produit_id, mat_produits!inner(marque, modele, mat_sous_categories!inner(nom))')
+        .select('produit_id, numero_serie, date_installation, garantie_fin, statut, mat_produits!inner(marque, modele, mat_sous_categories!inner(nom))')
         .eq('client_airtable_id', contactId)
       if (data) {
         // Load RAG catalog for links
@@ -80,6 +84,10 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
             brand: (prod?.marque || '') as string,
             model: (prod?.modele || '') as string,
             type: (sc?.nom || '') as string,
+            numero_serie: d.numero_serie as string | null,
+            date_installation: d.date_installation as string | null,
+            garantie_fin: d.garantie_fin as string | null,
+            statut: d.statut as string | null,
             notice_url: (ragMatch?.notice_url || undefined) as string | undefined,
             links: (ragMatch?.links || []) as Equipment['links'],
             topics: (ragMatch?.topics || []) as Equipment['topics'],
@@ -121,6 +129,10 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
       if (equipment.length > 0) {
         equipCtx = '\n\n[MATERIEL DU CLIENT]\n' + equipment.map(e => {
           let line = `- ${e.brand} ${e.model} (${e.type})`
+          if (e.numero_serie) line += `\n  N° SERIE: ${e.numero_serie}`
+          if (e.date_installation) line += `\n  DATE INSTALLATION: ${e.date_installation}`
+          if (e.garantie_fin) line += `\n  FIN DE GARANTIE: ${e.garantie_fin}`
+          if (e.statut) line += `\n  STATUT: ${e.statut}`
           if (e.notice_url) line += `\n  NOTICE_PDF: ${e.notice_url}`
           if (e.links?.length) line += '\n  GUIDES: ' + e.links.map(l => `${l.label}: ${l.url}`).join(' | ')
           if (e.topics?.length) line += '\n  SUJETS: ' + e.topics.map(t => t.guide_url ? `[${t.label}](${t.guide_url})` : t.label).join(' | ')
