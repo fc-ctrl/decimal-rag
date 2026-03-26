@@ -298,6 +298,7 @@ export default function CatalogPage() {
                     <option>Pompe à chaleur</option>
                     <option>Électrolyseur</option>
                     <option>Régulateur</option>
+                    <option>Traitement UV</option>
                     <option>Filtre</option>
                     <option>Volet</option>
                     <option>Robot</option>
@@ -457,6 +458,7 @@ export default function CatalogPage() {
                     <option>Pompe à chaleur</option>
                     <option>Électrolyseur</option>
                     <option>Régulateur</option>
+                    <option>Traitement UV</option>
                     <option>Filtre</option>
                     <option>Volet</option>
                     <option>Robot</option>
