@@ -157,6 +157,22 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
       const data = await res.json()
       const answer = data.output || data.answer || 'Désolé, je n\'ai pas pu répondre.'
 
+      // Save conversation to rag_conversations + rag_messages for audit
+      try {
+        const convId = crypto.randomUUID()
+        await supabase.from('rag_conversations').insert({
+          id: convId,
+          title: input.substring(0, 100),
+          source: 'client',
+          client_contact_id: contactId,
+          metadata: { client_name: clientName, equipment_context: equipCtx }
+        })
+        await supabase.from('rag_messages').insert([
+          { conversation_id: convId, role: 'user', content: input, metadata: { equipment_context: equipCtx } },
+          { conversation_id: convId, role: 'assistant', content: answer }
+        ])
+      } catch {}
+
       // Typing effect
       const msgId = crypto.randomUUID()
       setMessages(m => [...m, { id: msgId, role: 'assistant', content: '' }])
