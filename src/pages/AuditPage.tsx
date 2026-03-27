@@ -24,6 +24,8 @@ interface AuditResult {
   question: string
   answer: string
   source?: string
+  client_name?: string
+  date?: string
   score?: number
   scores?: { fidelite: number; liens: number; equipement: number; format: number; cosy: number }
   issues?: string[]
@@ -192,7 +194,11 @@ export default function AuditPage() {
                                 >
                                   <div className="flex-1 min-w-0">
                                     <div className="text-xs font-medium truncate">{r.question?.substring(0, 80)}</div>
-                                    {r.source && <span className="text-[10px] text-text-muted">{r.source}</span>}
+                                    <div className="flex gap-2 mt-0.5">
+                                      {r.client_name && <span className="text-[10px] font-medium text-sky-600">{r.client_name}</span>}
+                                      {r.source && <span className="text-[10px] text-text-muted">{r.source}</span>}
+                                      {r.date && <span className="text-[10px] text-text-muted">{new Date(r.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
+                                    </div>
                                   </div>
                                   <div className="flex items-center gap-2 ml-3">
                                     <ScoreIcon score={r.score} />
