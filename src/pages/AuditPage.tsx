@@ -57,6 +57,7 @@ export default function AuditPage() {
   const [reports, setReports] = useState<AuditReport[]>([])
   const [loading, setLoading] = useState(true)
   const [launching, setLaunching] = useState(false)
+  const [auditDays, setAuditDays] = useState(7)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedResult, setExpandedResult] = useState<string | null>(null)
 
@@ -78,7 +79,7 @@ export default function AuditPage() {
       await fetch(AUDIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ manual: true }),
+        body: JSON.stringify({ manual: true, days: auditDays }),
       })
       // Poll for completion
       for (let i = 0; i < 60; i++) {
@@ -102,14 +103,21 @@ export default function AuditPage() {
             <ClipboardCheck size={24} className="text-primary" />
             <h1 className="text-xl font-semibold">Audit Qualité RAG</h1>
           </div>
-          <button
-            onClick={launchAudit}
-            disabled={launching}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
-          >
-            {launching ? <Loader size={16} className="animate-spin" /> : <Play size={16} />}
-            {launching ? 'Audit en cours...' : 'Lancer un audit'}
-          </button>
+          <div className="flex items-center gap-2">
+            <select value={auditDays} onChange={e => setAuditDays(Number(e.target.value))} className="px-3 py-2 border border-border rounded-lg text-sm">
+              <option value={1}>1 jour</option>
+              <option value={7}>7 jours</option>
+              <option value={30}>30 jours</option>
+            </select>
+            <button
+              onClick={launchAudit}
+              disabled={launching}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-hover disabled:opacity-50"
+            >
+              {launching ? <Loader size={16} className="animate-spin" /> : <Play size={16} />}
+              {launching ? 'Audit en cours...' : 'Lancer un audit'}
+            </button>
+          </div>
         </div>
 
         <p className="text-sm text-text-muted mb-6">
