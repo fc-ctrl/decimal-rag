@@ -7,6 +7,8 @@ interface ConvWithMessages {
   title: string
   created_at: string
   updated_at: string
+  source?: string
+  metadata?: { client_name?: string }
   messages: { role: string; content: string; created_at: string }[]
 }
 
@@ -141,7 +143,9 @@ export default function HistoryPage() {
                   <MessageSquare size={16} className="text-text-muted shrink-0" />
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">{conv.title}</div>
-                    <div className="text-xs text-text-muted">
+                    <div className="text-xs text-text-muted flex items-center gap-2">
+                      {conv.metadata?.client_name && <span className="text-sky-600 font-medium">{conv.metadata.client_name}</span>}
+                      {conv.source === 'client' && <span className="bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded text-[10px]">client</span>}
                       {questionCount} question{questionCount > 1 ? 's' : ''}
                       {' · '}{new Date(conv.updated_at).toLocaleDateString('fr-FR')}
                       {' à '}{new Date(conv.updated_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
