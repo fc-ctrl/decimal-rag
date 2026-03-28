@@ -144,11 +144,19 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
         }).join('\n')
       }
 
+      // Structure: context first, then question last (GPT-4o focuses on the end)
+      let chatInput = ''
+      if (imageData) {
+        chatInput = input + catalogCtx
+      } else {
+        chatInput = equipCtx + '\n\n============================\nQUESTION DU CLIENT (REPONDRE A CETTE QUESTION):\n============================\n' + input + '\n\nIMPORTANT: Réponds UNIQUEMENT à cette question. Ne liste PAS le matériel sauf si le client demande explicitement "quel est mon matériel".'
+      }
+
       const res = await fetch(CHAT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          chatInput: input + (imageData ? catalogCtx : equipCtx),
+          chatInput,
           sessionId: 'cosy-' + contactId + '-' + Date.now(),
           skipCache: true,
           ...(imageData ? { image: imageData } : {}),
