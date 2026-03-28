@@ -124,32 +124,15 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
     setSending(true)
 
     try {
-      // Build context with client equipment + RAG info (notices, guides)
-      let equipCtx = ''
-      if (equipment.length > 0) {
-        equipCtx = '\n\n[MATERIEL DU CLIENT]\n' + equipment.map(e => {
-          let line = `- ${e.brand} ${e.model} (${e.type})`
-          if (e.numero_serie) line += `\n  N° SERIE: ${e.numero_serie}`
-          if (e.date_installation) line += `\n  DATE INSTALLATION: ${e.date_installation}`
-          if (e.garantie_fin) line += `\n  FIN DE GARANTIE: ${e.garantie_fin}`
-          if (e.statut) line += `\n  STATUT: ${e.statut}`
-          if (e.notice_url) line += `\n  NOTICE_PDF: ${e.notice_url}`
-          if (e.links?.length) line += '\n  GUIDES: ' + e.links.map(l => `${l.label}: ${l.url}`).join(' | ')
-          if (e.topics?.length) line += '\n  SUJETS:\n' + e.topics.map(t => {
-            let s = `  - ${t.label}: ${t.description || ''}`
-            if (t.guide_url) s += ` → ${t.guide_url}`
-            return s
-          }).join('\n')
-          return line
-        }).join('\n')
-      }
+      // Build SHORT equipment summary (just names) to avoid GPT-4o listing them
+      const equipNames = equipment.map(e => `${e.brand} ${e.model} (${e.type})`).join(', ')
+      const equipShort = equipment.length > 0 ? `\n[Matériel du client: ${equipNames}]` : ''
 
-      // Structure: context first, then question last (GPT-4o focuses on the end)
       let chatInput = ''
       if (imageData) {
         chatInput = input + catalogCtx
       } else {
-        chatInput = equipCtx + '\n\n============================\nQUESTION DU CLIENT (REPONDRE A CETTE QUESTION):\n============================\n' + input + '\n\nIMPORTANT: Réponds UNIQUEMENT à cette question. Ne liste PAS le matériel sauf si le client demande explicitement "quel est mon matériel".'
+        chatInput = input + equipShort
       }
 
       const res = await fetch(CHAT_URL, {
@@ -173,10 +156,10 @@ export default function ClientChat({ clientName, contactId, onBack }: Props) {
           title: input.substring(0, 100),
           source: 'client',
           client_contact_id: contactId,
-          metadata: { client_name: clientName, equipment_context: equipCtx }
+          metadata: { client_name: clientName, equipment_context: equipShort }
         })
         await supabase.from('rag_messages').insert([
-          { conversation_id: convId, role: 'user', content: input, metadata: { equipment_context: equipCtx } },
+          { conversation_id: convId, role: 'user', content: input, metadata: { equipment_context: equipShort } },
           { conversation_id: convId, role: 'assistant', content: answer }
         ])
       } catch {}
