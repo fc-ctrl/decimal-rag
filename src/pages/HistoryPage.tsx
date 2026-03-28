@@ -62,6 +62,7 @@ export default function HistoryPage() {
     if (!search) return true
     const q = search.toLowerCase()
     return c.title.toLowerCase().includes(q) ||
+      (c.metadata?.client_name || '').toLowerCase().includes(q) ||
       c.messages.some(m => m.content.toLowerCase().includes(q))
   })
 
